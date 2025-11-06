@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr" class="">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welloh</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {},
+      },
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+    /* Basic prose styles for markdown rendering */
+    .prose { @apply text-gray-700 dark:text-gray-300; }
+    .prose h1, .prose h2, .prose h3 { @apply font-bold text-gray-900 dark:text-gray-100; }
+    .prose a { @apply text-indigo-600 hover:underline dark:text-indigo-400; }
+    .prose code { @apply text-sm bg-gray-200 dark:bg-gray-700 rounded px-1 py-0.5; }
+    .prose pre { @apply bg-gray-100 dark:bg-gray-800 rounded p-4 text-sm; }
+    .prose ul { @apply list-disc list-inside; }
+    .prose ol { @apply list-decimal list-inside; }
+
+    @layer utilities {
+      .bg-grid-gray-200\/40 {
+        background-image: linear-gradient(to right, theme('colors.gray.200 / 40%') 1px, transparent 1px), linear-gradient(to bottom, theme('colors.gray.200 / 40%') 1px, transparent 1px);
+        background-size: 2rem 2rem;
+      }
+      .dark .bg-grid-gray-700\/30 {
+        background-image: linear-gradient(to right, theme('colors.gray.700 / 30%') 1px, transparent 1px), linear-gradient(to bottom, theme('colors.gray.700 / 30%') 1px, transparent 1px);
+        background-size: 2rem 2rem;
+      }
+    }
+    @keyframes fade-in-up {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-fade-in-up {
+      animation: fade-in-up 1s ease-out forwards;
+    }
+  </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-markdown": "https://aistudiocdn.com/react-markdown@9.0.1",
+    "react": "https://aistudiocdn.com/react@18.3.1",
+    "react/": "https://aistudiocdn.com/react@18.3.1/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@18.3.1/",
+    "recharts": "https://aistudiocdn.com/recharts@2.12.7",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
+    "remark-gfm": "https://aistudiocdn.com/remark-gfm@4.0.0",
+    "typescript": "https://aistudiocdn.com/typescript@^5.9.3"
+  }
+}
+</script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
