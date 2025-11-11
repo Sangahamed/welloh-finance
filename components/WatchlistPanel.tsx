@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getStockData } from '../services/geminiService';
-import { StockData } from '../types';
+import { StockData, WatchlistItem } from '../types';
 import { ChartTrendingUpIcon, StarIcon } from './icons/Icons';
 
 interface WatchlistPanelProps {
-    watchlist: string[];
-    onToggleWatchlist: (ticker: string) => void;
+    watchlist: WatchlistItem[];
+    onToggleWatchlist: (ticker: string, exchange: string) => void;
     onSelectStock: (ticker: string) => void;
 }
 
@@ -24,7 +24,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({ watchlist, onToggleWatc
                 return;
             }
             setIsLoading(true);
-            const stockPromises = watchlist.map(ticker => getStockData(ticker).catch(() => null));
+            const stockPromises = watchlist.map(item => getStockData(item.ticker).catch(() => null));
             const results = await Promise.all(stockPromises);
             setStocks(results.filter((stock): stock is StockData => stock !== null));
             setIsLoading(false);
@@ -44,7 +44,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({ watchlist, onToggleWatc
                     <div className="text-sm text-gray-500 dark:text-gray-400">Chargement des données...</div>
                 )}
                 {!isLoading && stocks.length > 0 && stocks.map(stock => (
-                    <div key={stock.ticker} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <div key={`${stock.ticker}-${stock.exchange}`} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <div className="flex-1 cursor-pointer" onClick={() => onSelectStock(stock.ticker)}>
                             <p className="font-bold text-gray-900 dark:text-gray-100">{stock.ticker}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate w-32">{stock.companyName}</p>
@@ -56,7 +56,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({ watchlist, onToggleWatc
                             </p>
                         </div>
                         <button 
-                            onClick={() => onToggleWatchlist(stock.ticker)}
+                            onClick={() => onToggleWatchlist(stock.ticker, stock.exchange)}
                             className="ml-4 text-yellow-400 hover:text-yellow-500 dark:text-yellow-500 dark:hover:text-yellow-400 p-1"
                             title="Retirer de la liste"
                         >

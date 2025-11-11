@@ -4,12 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welloh</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
-        extend: {},
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+        },
       },
     }
   </script>
@@ -26,16 +33,10 @@
     .prose ul { @apply list-disc list-inside; }
     .prose ol { @apply list-decimal list-inside; }
 
-    @layer utilities {
-      .bg-grid-gray-200\/40 {
-        background-image: linear-gradient(to right, theme('colors.gray.200 / 40%') 1px, transparent 1px), linear-gradient(to bottom, theme('colors.gray.200 / 40%') 1px, transparent 1px);
-        background-size: 2rem 2rem;
-      }
-      .dark .bg-grid-gray-700\/30 {
-        background-image: linear-gradient(to right, theme('colors.gray.700 / 30%') 1px, transparent 1px), linear-gradient(to bottom, theme('colors.gray.700 / 30%') 1px, transparent 1px);
-        background-size: 2rem 2rem;
-      }
+    body {
+        font-family: 'Inter', sans-serif;
     }
+    
     @keyframes fade-in-up {
       from {
         opacity: 0;
@@ -49,6 +50,34 @@
     .animate-fade-in-up {
       animation: fade-in-up 1s ease-out forwards;
     }
+
+    @keyframes gradient-pan {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+    .animate-gradient-pan {
+      background-size: 200% 200%;
+      animation: gradient-pan 15s ease infinite;
+    }
+
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-20px);
+      }
+    }
+    .animate-float {
+      animation: float 6s ease-in-out infinite;
+    }
   </style>
   <script type="importmap">
 {
@@ -60,12 +89,13 @@
     "recharts": "https://aistudiocdn.com/recharts@2.12.7",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
     "remark-gfm": "https://aistudiocdn.com/remark-gfm@4.0.0",
-    "typescript": "https://aistudiocdn.com/typescript@^5.9.3"
+    "typescript": "https://aistudiocdn.com/typescript@^5.9.3",
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.4/+esm"
   }
 }
 </script>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900">
+<body class="bg-[#0B0E15] dark">
   <noscript>You need to enable JavaScript to run this app.</noscript>
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>

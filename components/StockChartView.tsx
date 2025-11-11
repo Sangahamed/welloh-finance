@@ -8,7 +8,7 @@ import { StarIcon } from './icons/Icons';
 
 interface StockChartViewProps {
     ticker: string | null;
-    onToggleWatchlist: (ticker: string) => void;
+    onToggleWatchlist: (ticker: string, exchange: string) => void;
     isWatched: boolean;
 }
 
@@ -78,6 +78,7 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
             id: `txn_${Date.now()}`,
             type: tradeType,
             ticker: stockData.ticker,
+            exchange: stockData.exchange,
             companyName: stockData.companyName,
             shares: numShares,
             price: stockData.price,
@@ -91,7 +92,7 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
             }
             cash -= transactionCost;
             
-            const existingHoldingIndex = holdings.findIndex(h => h.ticker === stockData.ticker);
+            const existingHoldingIndex = holdings.findIndex(h => h.ticker === stockData.ticker && h.exchange === stockData.exchange);
             if (existingHoldingIndex > -1) {
                 const existing = holdings[existingHoldingIndex];
                 const newTotalShares = existing.shares + numShares;
@@ -100,6 +101,7 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
             } else {
                 holdings.push({
                     ticker: stockData.ticker,
+                    exchange: stockData.exchange,
                     companyName: stockData.companyName,
                     shares: numShares,
                     purchasePrice: stockData.price,
@@ -107,7 +109,7 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
                 });
             }
         } else { // sell
-            const existingHolding = holdings.find(h => h.ticker === stockData.ticker);
+            const existingHolding = holdings.find(h => h.ticker === stockData.ticker && h.exchange === stockData.exchange);
             if (!existingHolding || existingHolding.shares < numShares) {
                 alert("Vous n'avez pas assez d'actions à vendre.");
                 return;
@@ -115,17 +117,22 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
             cash += transactionCost;
             existingHolding.shares -= numShares;
             if (existingHolding.shares === 0) {
-                holdings = holdings.filter(h => h.ticker !== stockData.ticker);
+                holdings = holdings.filter(h => h.ticker !== stockData.ticker || h.exchange !== stockData.exchange);
             }
         }
         
-        await updateCurrentUserAccount({
-            portfolio: { ...currentUserAccount.portfolio, cash, holdings },
-            transactions: [...currentUserAccount.transactions, newTransaction]
-        });
+        try {
+            await updateCurrentUserAccount({
+                portfolio: { ...currentUserAccount.portfolio, cash, holdings },
+                transactions: [...currentUserAccount.transactions, newTransaction]
+            });
 
-        alert(`Transaction réussie !`);
-        setShares('');
+            alert(`Transaction réussie !`);
+            setShares('');
+        } catch (err) {
+            console.error("Échec de la transaction:", err);
+            alert(`La transaction a échoué: ${err instanceof Error ? err.message : 'Une erreur inconnue est survenue.'}`);
+        }
     };
     
     const axisColor = theme === 'dark' ? '#9ca3af' : '#4b5563';
@@ -160,7 +167,7 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
                     <p className={`text-3xl font-bold ${priceColor}`}>{formatCurrency(stockData.price)}</p>
                     <p className={`text-sm font-semibold ${priceColor}`}>{stockData.change > 0 ? '+' : ''}{stockData.change.toFixed(2)} ({stockData.percentChange})</p>
                 </div>
-                 <button onClick={() => onToggleWatchlist(stockData.ticker)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title={isWatched ? "Retirer de la liste" : "Ajouter à la liste"}>
+                 <button onClick={() => onToggleWatchlist(stockData.ticker, stockData.exchange)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title={isWatched ? "Retirer de la liste" : "Ajouter à la liste"}>
                     <StarIcon className={`h-6 w-6 ${isWatched ? 'text-yellow-400' : 'text-gray-400'}`} fill={isWatched ? "currentColor" : "none"} />
                 </button>
             </div>

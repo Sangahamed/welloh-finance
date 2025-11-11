@@ -1,11 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
-import type { StockData, MarketIndex, AnalysisData, NewsArticle, HistoricalPricePoint } from '../types';
+import type { StockData, MarketIndex, AnalysisData, NewsArticle, HistoricalPricePoint, PublicTender } from '../types';
 
-if (!process.env.API_KEY) {
-    // This is a client-side check. The API key is expected to be in the environment.
-    throw new Error("API_KEY environment variable not set.");
-}
-
+// L'initialisation se fait maintenant directement.
+// L'environnement d'exécution DOIT fournir process.env.API_KEY.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const cleanJsonString = (text: string): string => {
@@ -33,6 +30,7 @@ const handleApiError = (error: unknown, genericErrorMessage: string): never => {
     
     throw new Error(`${genericErrorMessage} L'API a peut-être renvoyé une erreur ou un format inattendu.`);
 };
+
 
 export const getFinancialAnalysis = async (
   identifier: string,
@@ -199,4 +197,58 @@ export const getMarketOverview = async (): Promise<MarketIndex[]> => {
     } catch (error) {
         handleApiError(error, "Impossible de récupérer l'aperçu du marché.");
     }
+};
+
+export const searchPublicTenders = async (query: string): Promise<PublicTender[]> => {
+    const prompt = `Agis comme une API de base de données de marchés publics. En te basant sur la requête "${query}", fournis une liste d'appels d'offres publics pertinents, avec un focus sur les marchés africains si la requête est générale. La réponse doit être UNIQUEMENT un objet JSON valide sous forme de tableau, sans aucun texte ou formatage supplémentaire comme du markdown.
+        Chaque objet du tableau doit avoir la structure suivante :
+        {
+            "id": string (un identifiant unique que tu génères, ex: "tend_12345"),
+            "title": string,
+            "country": string,
+            "sector": string,
+            "issuingEntity": string,
+            "summary": string,
+            "deadline": "YYYY-MM-DD",
+            "uri": string (une URL source valide)
+        }
+        Retourne entre 5 et 10 appels d'offres réalistes mais fictifs. Assure-toi que les données sont crédibles et bien formatées.`;
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-pro",
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+            },
+        });
+        const jsonText = cleanJsonString(response.text);
+        const data = JSON.parse(jsonText);
+
+        if (!Array.isArray(data)) {
+            throw new Error("Le format des données des appels d'offres est invalide.");
+        }
+        
+        return data;
+    } catch (error) {
+        handleApiError(error, "Impossible de rechercher les appels d'offres.");
+    }
+};
+
+export const generateStrategyStream = async (prompt: string) => {
+    return await ai.models.generateContentStream({
+        model: "gemini-2.5-flash",
+        contents: `Agis en tant que conseiller financier expert et mentor. Génère une stratégie d'investissement détaillée ou une réponse instructive basée sur la demande suivante : "${prompt}". La réponse doit être bien structurée, informative, et facile à comprendre. Utilise le format Markdown.`,
+    });
+};
+
+export const getEducationalContentStream = async (topic: string) => {
+    const prompt = `En tant qu'éducateur financier expert, rédige un article clair et concis sur le sujet suivant : "${topic}".
+    L'article doit être bien structuré, facile à comprendre pour un public varié (allant du débutant à l'intermédiaire), et utiliser le format Markdown.
+    Inclus des titres, des listes à puces si nécessaire, et mets en gras les termes importants.
+    L'objectif est d'être informatif et engageant.`;
+    
+    return await ai.models.generateContentStream({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+    });
 };

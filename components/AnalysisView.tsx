@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import type { AnalysisData, NewsArticle, HistoryItem, Alert } from '../types';
 import AnalysisForm from './AnalysisForm';
 import AnalysisResult from './AnalysisResult';
@@ -35,68 +36,38 @@ const AnalysisSkeleton: React.FC = () => (
 
 
 const AnalysisView: React.FC = () => {
+    // Get data and functions from AuthContext
+    const { currentUserAccount, addHistoryItem, clearHistory, addAlert, removeAlert } = useAuth();
+    
     // Analysis state
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [analysisData, setAnalysisData] = useState<{ main: AnalysisData, comparison: AnalysisData | null } | null>(null);
     const [news, setNews] = useState<NewsArticle[] | null>(null);
 
-    // History state
-    const [history, setHistory] = useState<HistoryItem[]>([]);
+    // History and Alerts state are now derived from the context
+    const history = currentUserAccount?.analysisHistory || [];
+    const alerts = currentUserAccount?.alerts || [];
 
-    // Alerts state
-    const [alerts, setAlerts] = useState<Alert[]>([]);
+    // Triggered alerts state remains local to this view
     const [triggeredAlerts, setTriggeredAlerts] = useState<(Alert & { triggeredValue?: string })[]>([]);
 
-    // Settings state
+    // Settings state remains local
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-    // Load history and alerts from localStorage on mount
-    useEffect(() => {
-        try {
-            const storedHistory = localStorage.getItem('analysisHistory');
-            if (storedHistory) setHistory(JSON.parse(storedHistory));
-
-            const storedAlerts = localStorage.getItem('analysisAlerts');
-            if (storedAlerts) setAlerts(JSON.parse(storedAlerts));
-        } catch (e) {
-            console.error("Failed to parse from localStorage", e);
-        }
-    }, []);
-
-    // Save history to localStorage
-    useEffect(() => {
-        try {
-            localStorage.setItem('analysisHistory', JSON.stringify(history));
-        } catch (e) {
-            console.error("Failed to save history to localStorage", e);
-        }
-    }, [history]);
-
-    // Save alerts to localStorage
-    useEffect(() => {
-        try {
-            localStorage.setItem('analysisAlerts', JSON.stringify(alerts));
-        } catch (e) {
-            console.error("Failed to save alerts to localStorage", e);
-        }
-    }, [alerts]);
-
+    
     const checkAlerts = useCallback((data: AnalysisData) => {
         const triggered: (Alert & { triggeredValue?: string })[] = [];
-        const remainingAlerts = [...alerts];
-
+        
         data.keyMetrics.forEach(metric => {
-            const metricValue = parseFloat(metric.value);
+            const metricValue = parseFloat(metric.value.replace(/[^0-9.-]+/g,""));
             if (isNaN(metricValue)) return;
 
             alerts.forEach(alert => {
                 if (alert.metricLabel === metric.label) {
                     if ((alert.condition === 'gt' && metricValue > alert.threshold) || (alert.condition === 'lt' && metricValue < alert.threshold)) {
                         triggered.push({ ...alert, triggeredValue: metric.value });
-                        // Remove triggered alert
-                        const index = remainingAlerts.findIndex(a => a.id === alert.id);
-                        if(index > -1) remainingAlerts.splice(index, 1);
+                        // Remove triggered alert from DB and context state
+                        removeAlert(alert.id);
                     }
                 }
             });
@@ -104,9 +75,8 @@ const AnalysisView: React.FC = () => {
 
         if (triggered.length > 0) {
             setTriggeredAlerts(prev => [...prev, ...triggered]);
-            setAlerts(remainingAlerts);
         }
-    }, [alerts]);
+    }, [alerts, removeAlert]);
 
     const handleAnalysisStart = useCallback(() => {
         setIsLoading(true);
@@ -119,19 +89,17 @@ const AnalysisView: React.FC = () => {
         setAnalysisData(data);
         setNews(newsData);
         setIsLoading(false);
-        // Add to history
-        const historyItem: HistoryItem = {
-            id: `hist_${Date.now()}`,
-            timestamp: Date.now(),
+        // Add to history via context
+        const historyItem: Omit<HistoryItem, 'id' | 'timestamp'> = {
             companyIdentifier: data.main.companyName,
             comparisonIdentifier: data.comparison?.companyName,
             currency: 'USD', // This should ideally come from the form
             analysisData: data,
             news: newsData,
         };
-        setHistory(prev => [historyItem, ...prev.slice(0, 19)]); // Keep latest 20
+        addHistoryItem(historyItem);
         checkAlerts(data.main);
-    }, [checkAlerts]);
+    }, [checkAlerts, addHistoryItem]);
 
     const handleAnalysisError = useCallback((errorMessage: string) => {
         setError(errorMessage);
@@ -146,16 +114,9 @@ const AnalysisView: React.FC = () => {
         window.scrollTo(0, 0);
     }, []);
 
-    const handleClearHistory = useCallback(() => setHistory([]), []);
-
-    const handleSetAlert = useCallback((alertData: Omit<Alert, 'id'>) => {
-        const newAlert: Alert = { ...alertData, id: `alert_${Date.now()}` };
-        setAlerts(prev => [...prev, newAlert]);
-    }, []);
-
-    const handleRemoveAlert = useCallback((id: string) => {
-        setAlerts(prev => prev.filter(a => a.id !== id));
-    }, []);
+    const handleClearHistory = useCallback(() => clearHistory(), [clearHistory]);
+    const handleSetAlert = useCallback((alertData: Omit<Alert, 'id'>) => addAlert(alertData), [addAlert]);
+    const handleRemoveAlert = useCallback((id: string) => removeAlert(id), [removeAlert]);
 
     const handleCloseNotification = (id: string) => {
         setTriggeredAlerts(prev => prev.filter(a => a.id !== id));

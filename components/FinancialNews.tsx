@@ -30,17 +30,18 @@ const FinancialNews: React.FC<FinancialNewsProps> = ({ articles, isLoading }) =>
       {isLoading ? (
         <NewsSkeleton />
       ) : articles && articles.length > 0 ? (
-        <ul className="space-y-3">
+        <ul className="space-y-4">
           {articles.map((article, index) => (
             <li key={index}>
+              <p className="font-medium text-gray-800 dark:text-gray-200">{article.title}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{article.uri}</p>
               <a
                 href={article.uri}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-200 group"
+                className="text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 mt-1 inline-block transition-colors duration-200"
               >
-                <p className="font-medium group-hover:underline">{article.title}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{article.uri}</p>
+                Lire la suite &rarr;
               </a>
             </li>
           ))}

@@ -1,7 +1,14 @@
-import React from 'react';
-import { BookOpenIcon } from './icons/Icons';
+import React, { useState } from 'react';
+import { BookOpenIcon, PlayIcon } from './icons/Icons';
+import { getEducationalContentStream } from '../services/geminiService';
+import EducationModal from './EducationModal';
 
 const EducationView: React.FC = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState('');
+  const [modalContent, setModalContent] = useState('');
+  const [isContentLoading, setIsContentLoading] = useState(false);
+  const [contentError, setContentError] = useState<string | null>(null);
 
   const content = {
     beginner: [
@@ -27,6 +34,77 @@ const EducationView: React.FC = () => {
     ]
   };
 
+  const videoTutorials = [
+    {
+        title: "Prise en main de la plateforme Welloh",
+        description: "Découvrez l'interface du dashboard, le passage d'ordres et le suivi de portefeuille.",
+        thumbnail: "https://placehold.co/600x400/1e293b/9ca3af?text=Welloh"
+    },
+    {
+        title: "Maîtriser l'outil d'Analyse IA",
+        description: "Apprenez à générer des rapports financiers complets et à comparer des actions efficacement.",
+        thumbnail: "https://placehold.co/600x400/3730a3/e0e7ff?text=Analyse+IA"
+    },
+    {
+        title: "Introduction au marché de la BRVM",
+        description: "Un aperçu des opportunités d'investissement en Afrique de l'Ouest.",
+        thumbnail: "https://placehold.co/600x400/166534/a7f3d0?text=BRVM"
+    }
+  ];
+  
+  const handleTopicClick = async (topic: string) => {
+    setSelectedTopic(topic);
+    setIsModalOpen(true);
+    setIsContentLoading(true);
+    setContentError(null);
+    setModalContent('');
+
+    try {
+        const stream = await getEducationalContentStream(topic);
+        let fullText = '';
+        for await (const chunk of stream) {
+            const chunkText = chunk.text;
+            if (chunkText) {
+                fullText += chunkText;
+                setModalContent(fullText);
+            }
+        }
+    } catch (error) {
+        setContentError(error instanceof Error ? error.message : "Une erreur est survenue lors de la récupération du contenu.");
+    } finally {
+        setIsContentLoading(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setTimeout(() => {
+        setSelectedTopic('');
+        setModalContent('');
+        setContentError(null);
+    }, 300); // Wait for animation
+  };
+
+  const handleVideoClick = () => {
+    alert("La lecture de vidéos sera bientôt disponible !");
+  };
+
+  const renderTopicList = (topics: string[]) => (
+    <ul className="space-y-3 list-disc list-inside text-gray-700 dark:text-gray-300">
+        {topics.map((title, i) => (
+            <li key={i}>
+                <button 
+                    onClick={() => handleTopicClick(title)}
+                    className="text-left w-full hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-200"
+                >
+                    {title}
+                </button>
+            </li>
+        ))}
+    </ul>
+  );
+
+
   return (
     <div className="space-y-8">
       <div className="text-center">
@@ -43,28 +121,56 @@ const EducationView: React.FC = () => {
         {/* Beginner */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
           <h3 className="text-xl font-bold mb-4 text-green-600 dark:text-green-400">Coin des Débutants</h3>
-          <ul className="space-y-3 list-disc list-inside text-gray-700 dark:text-gray-300">
-            {content.beginner.map((title, i) => <li key={i} className="hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer">{title}</li>)}
-          </ul>
+          {renderTopicList(content.beginner)}
         </div>
         {/* Intermediate */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
           <h3 className="text-xl font-bold mb-4 text-blue-600 dark:text-blue-400">Sujets Intermédiaires</h3>
-          <ul className="space-y-3 list-disc list-inside text-gray-700 dark:text-gray-300">
-            {content.intermediate.map((title, i) => <li key={i} className="hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer">{title}</li>)}
-          </ul>
+          {renderTopicList(content.intermediate)}
         </div>
         {/* Africa Focus */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
           <h3 className="text-xl font-bold mb-4 text-yellow-600 dark:text-yellow-400">Focus sur l'Afrique</h3>
-          <ul className="space-y-3 list-disc list-inside text-gray-700 dark:text-gray-300">
-            {content.africaFocus.map((title, i) => <li key={i} className="hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer">{title}</li>)}
-          </ul>
+          {renderTopicList(content.africaFocus)}
         </div>
       </div>
-       <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            Note: Le contenu est à des fins éducatives. Cliquez sur un titre pour en savoir plus (fonctionnalité à venir).
-        </p>
+        
+      {/* Video Tutorials Section */}
+      <div className="pt-8">
+         <div className="text-center mb-8">
+            <h3 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-3xl">
+                Tutoriels Vidéo
+            </h3>
+            <p className="mt-2 max-w-2xl mx-auto text-md text-gray-600 dark:text-gray-300">
+                Apprenez visuellement avec nos guides pas à pas.
+            </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {videoTutorials.map((video) => (
+                <div key={video.title} onClick={handleVideoClick} className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden group cursor-pointer">
+                    <div className="relative">
+                        <img src={video.thumbnail} alt={video.title} className="w-full h-48 object-cover" />
+                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <PlayIcon className="h-16 w-16 text-white" />
+                        </div>
+                    </div>
+                    <div className="p-4">
+                        <h4 className="font-bold text-lg text-gray-900 dark:text-gray-100">{video.title}</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{video.description}</p>
+                    </div>
+                </div>
+            ))}
+        </div>
+      </div>
+      
+      <EducationModal 
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          title={selectedTopic}
+          content={modalContent}
+          isLoading={isContentLoading}
+          error={contentError}
+      />
     </div>
   );
 };

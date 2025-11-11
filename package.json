@@ -15,7 +15,8 @@
     "recharts": "2.12.7",
     "@google/genai": "^1.25.0",
     "remark-gfm": "4.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@supabase/supabase-js": "2.44.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

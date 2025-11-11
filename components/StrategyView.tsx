@@ -1,10 +1,9 @@
 
+
 import React, { useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { generateStrategyStream } from '../services/geminiService';
 import { LightBulbIcon, SparklesIcon } from './icons/Icons';
 import MarkdownRenderer from './MarkdownRenderer';
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const StrategyView: React.FC = () => {
     const [prompt, setPrompt] = useState('Créer une stratégie d\'investissement pour un profil à risque modéré, axée sur la croissance à long terme avec des ETFs en se concentrant sur le marché Africain.');
@@ -23,10 +22,7 @@ const StrategyView: React.FC = () => {
         setStrategy('');
 
         try {
-            const response = await ai.models.generateContentStream({
-                model: "gemini-2.5-flash",
-                contents: `Agis en tant que conseiller financier expert et mentor. Génère une stratégie d'investissement détaillée ou une réponse instructive basée sur la demande suivante : "${prompt}". La réponse doit être bien structurée, informative, et facile à comprendre. Utilise le format Markdown.`,
-            });
+            const response = await generateStrategyStream(prompt);
             
             let fullText = '';
             for await (const chunk of response) {

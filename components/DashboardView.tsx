@@ -1,15 +1,29 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getMarketOverview, getStockData, searchStocks } from '../services/geminiService';
-import type { MarketIndex, Transaction, StockHolding, Portfolio, StockData } from '../types';
+import type { MarketIndex, Transaction, StockHolding, Portfolio, StockData, WatchlistItem } from '../types';
 import MarketOverview from './MarketOverview';
 import WatchlistPanel from './WatchlistPanel';
 import StockChartView from './StockChartView';
+import LevelUpNotification from './LevelUpNotification';
 import { WalletIcon, BriefcaseIcon, ClockIcon, MagnifyingGlassIcon } from './icons/Icons';
 
 const formatCurrency = (value: number | null | undefined) => {
     if (value == null) return 'N/A';
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD' }).format(value);
+};
+
+const levels = [
+    { name: 'Novice', threshold: 0, color: 'text-gray-400' },
+    { name: 'Apprenti', threshold: 110000, color: 'text-green-400' },
+    { name: 'Trader', threshold: 150000, color: 'text-blue-400' },
+    { name: 'Investisseur', threshold: 250000, color: 'text-indigo-400' },
+    { name: 'Maestro', threshold: 500000, color: 'text-purple-400' },
+];
+
+const getLevel = (value: number) => {
+    return [...levels].reverse().find(level => value >= level.threshold) || levels[0];
 };
 
 // Search Results Table Component
@@ -64,7 +78,7 @@ const SearchResultsSkeleton: React.FC = () => (
 // Portfolio Panel Component
 const PortfolioPanel: React.FC<{ portfolio: Portfolio }> = ({ portfolio }) => {
     const { cash, holdings, initialValue } = portfolio;
-    const holdingsValue = holdings.reduce((acc, h) => acc + (h.shares * h.currentValue), 0);
+    const holdingsValue = holdings.reduce((acc, h) => acc + (h.shares * h.currentValue!), 0);
     const totalValue = cash + holdingsValue;
     const totalGainLoss = totalValue - initialValue;
     const totalReturnPercent = initialValue > 0 ? (totalGainLoss / initialValue) * 100 : 0;
@@ -116,7 +130,7 @@ const HoldingsTable: React.FC<{ holdings: StockHolding[] }> = ({ holdings }) => 
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {holdings.map(h => {
-                        const totalValue = h.shares * h.currentValue;
+                        const totalValue = h.shares * (h.currentValue || h.purchasePrice);
                         const totalCost = h.shares * h.purchasePrice;
                         const gainLoss = totalValue - totalCost;
                         const gainLossPercent = totalCost > 0 ? (gainLoss / totalCost) * 100 : 0;
@@ -144,7 +158,7 @@ export const TransactionHistory: React.FC<{ transactions: Transaction[] }> = ({ 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
             <h3 className="text-xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center mb-4"><ClockIcon /><span className="ml-2">Historique des Transactions</span></h3>
             <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                {transactions.length > 0 ? [...transactions].reverse().map(t => (
+                {transactions.length > 0 ? transactions.map(t => (
                     <div key={t.id} className={`flex justify-between items-center p-2 rounded-md border-l-4 ${t.type === 'buy' ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20'}`}>
                         <div>
                             <p className="font-bold text-gray-800 dark:text-gray-200">{t.type === 'buy' ? 'Achat' : 'Vente'} - {t.ticker}</p>
@@ -172,12 +186,14 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
     const [selectedTicker, setSelectedTicker] = useState<string | null>('AAPL');
     const [refreshedPortfolio, setRefreshedPortfolio] = useState<Portfolio | null>(currentUserAccount?.portfolio ?? null);
     const [isPortfolioLoading, setIsPortfolioLoading] = useState(true);
+    const [levelUpNotification, setLevelUpNotification] = useState<{ oldLevel: string, newLevel: string } | null>(null);
     
     // State for market search
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<StockData[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [searchError, setSearchError] = useState<string | null>(null);
+    const [searchAttempted, setSearchAttempted] = useState(false);
 
 
     useEffect(() => {
@@ -207,6 +223,12 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
             setIsPortfolioLoading(true);
             const { holdings, ...restOfPortfolio } = currentUserAccount.portfolio;
 
+            // --- Level Up Check: Calculate old value before refresh ---
+            const oldHoldingsValue = holdings.reduce((acc, h) => acc + (h.shares * h.purchasePrice), 0);
+            const oldTotalValue = currentUserAccount.portfolio.cash + oldHoldingsValue;
+            const oldLevel = getLevel(oldTotalValue);
+            // ---
+
             if (holdings.length === 0) {
                 setRefreshedPortfolio(currentUserAccount.portfolio);
                 setIsPortfolioLoading(false);
@@ -222,10 +244,23 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
                     if (result.status === 'fulfilled' && result.value) {
                         return { ...holding, currentValue: result.value.price };
                     }
-                    return holding; // Keep old value if fetch fails
+                    // Fallback to purchase price if API fails
+                    return { ...holding, currentValue: holding.purchasePrice }; 
                 });
                 
-                setRefreshedPortfolio({ ...restOfPortfolio, holdings: updatedHoldings });
+                const newPortfolioState = { ...restOfPortfolio, holdings: updatedHoldings };
+                setRefreshedPortfolio(newPortfolioState);
+                
+                // --- Level Up Check: Compare with new value ---
+                const newHoldingsValue = updatedHoldings.reduce((acc, h) => acc + (h.shares * h.currentValue!), 0);
+                const newTotalValue = newPortfolioState.cash + newHoldingsValue;
+                const newLevel = getLevel(newTotalValue);
+
+                if (newLevel.threshold > oldLevel.threshold) {
+                    setLevelUpNotification({ oldLevel: oldLevel.name, newLevel: newLevel.name });
+                }
+                // ---
+
             } catch (e) {
                 console.error("Failed to refresh portfolio data:", e);
                 setRefreshedPortfolio(currentUserAccount.portfolio); // Fallback to stale data on error
@@ -242,8 +277,10 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
         if (!searchTerm.trim()) {
             setSearchResults([]);
             setSearchError(null);
+            setSearchAttempted(false);
             return;
         }
+        setSearchAttempted(true);
         setIsSearching(true);
         setSearchError(null);
         try {
@@ -262,22 +299,29 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
         setSearchResults([]);
         setSearchTerm('');
         setSearchError(null);
+        setSearchAttempted(false);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleToggleWatchlist = useCallback((ticker: string) => {
+    const handleToggleWatchlist = useCallback((ticker: string, exchange: string) => {
         if (!currentUserAccount) return;
-        const newWatchlist = currentUserAccount.watchlist.includes(ticker)
-            ? currentUserAccount.watchlist.filter(t => t !== ticker)
-            : [...currentUserAccount.watchlist, ticker];
+        const newWatchlistItem = { ticker, exchange };
+        const isInWatchlist = currentUserAccount.watchlist.some(
+            item => item.ticker === ticker && item.exchange === exchange
+        );
+
+        const newWatchlist = isInWatchlist
+            ? currentUserAccount.watchlist.filter(item => item.ticker !== ticker || item.exchange !== exchange)
+            : [...currentUserAccount.watchlist, newWatchlistItem];
+            
         updateCurrentUserAccount({ watchlist: newWatchlist });
     }, [currentUserAccount, updateCurrentUserAccount]);
 
     if (!currentUserAccount) {
         return <div>Chargement du tableau de bord...</div>;
     }
-
-    const showSearchResults = isSearching || searchError || (searchTerm.trim() !== '' && searchResults.length > 0);
+    
+    const isSelectedStockWatched = selectedTicker ? currentUserAccount.watchlist.some(item => item.ticker === selectedTicker) : false;
 
     return (
         <div className="space-y-8">
@@ -293,7 +337,14 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
                         <input
                             type="search"
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                if (e.target.value.trim() === '') {
+                                    setSearchAttempted(false);
+                                    setSearchResults([]);
+                                    setSearchError(null);
+                                }
+                            }}
                             placeholder="Rechercher une action (ex: 'banques au Nigéria', 'AAPL', 'Sonatel')"
                             className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md pl-10 pr-4 py-2.5 text-gray-800 dark:text-gray-200 focus:border-indigo-500 focus:ring-indigo-500"
                         />
@@ -306,23 +357,21 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
                         {isSearching ? 'Recherche...' : 'Rechercher'}
                     </button>
                 </form>
-                {showSearchResults && (
-                    <div className="mt-6">
-                        {isSearching && <SearchResultsSkeleton />}
-                        {searchError && <p className="text-red-500 text-center py-4">{searchError}</p>}
-                        {!isSearching && !searchError && searchResults.length > 0 && (
-                             <SearchResultsTable stocks={searchResults} onSelectStock={handleSelectStock} />
-                        )}
-                        {!isSearching && !searchError && searchTerm.trim() !== '' && searchResults.length === 0 && (
+                <div className="mt-6">
+                    {isSearching ? (
+                        <SearchResultsSkeleton />
+                    ) : searchError ? (
+                        <p className="text-red-500 text-center py-4">{searchError}</p>
+                    ) : searchAttempted ? (
+                        searchResults.length > 0 ? (
+                            <SearchResultsTable stocks={searchResults} onSelectStock={handleSelectStock} />
+                        ) : (
                             <p className="text-gray-500 dark:text-gray-400 text-center py-4">Aucun résultat pour "{searchTerm}".</p>
-                        )}
-                    </div>
-                )}
-                 {!showSearchResults && (
-                    <div className="mt-6">
-                       <MarketOverview indices={marketIndices} isLoading={marketLoading} error={marketError} />
-                    </div>
-                )}
+                        )
+                    ) : (
+                        <MarketOverview indices={marketIndices} isLoading={marketLoading} error={marketError} />
+                    )}
+                </div>
             </div>
             
             {isPortfolioLoading ? (
@@ -343,7 +392,7 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
                 key={selectedTicker} // Re-mount component on ticker change
                 ticker={selectedTicker} 
                 onToggleWatchlist={handleToggleWatchlist} 
-                isWatched={currentUserAccount.watchlist.includes(selectedTicker || '')}
+                isWatched={isSelectedStockWatched}
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -366,6 +415,17 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
                         onSelectStock={handleSelectStock}
                     />
                     <TransactionHistory transactions={currentUserAccount.transactions} />
+                </div>
+            </div>
+             {/* Notification Area */}
+            <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-50">
+                <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
+                    {levelUpNotification && (
+                        <LevelUpNotification 
+                            levelInfo={levelUpNotification} 
+                            onClose={() => setLevelUpNotification(null)} 
+                        />
+                    )}
                 </div>
             </div>
         </div>

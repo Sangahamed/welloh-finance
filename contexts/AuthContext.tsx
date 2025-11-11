@@ -1,118 +1,233 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
-import type { User, UserAccount } from '../types';
-import * as db from '../lib/database';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import {
+    getUserAccount,
+    updateUserAccount,
+    getAllUsers,
+    addAnalysisHistory as dbAddAnalysisHistory,
+    clearAnalysisHistory as dbClearAnalysisHistory,
+    addAlert as dbAddAlert,
+    removeAlert as dbRemoveAlert,
+} from '../lib/database';
+import type { User, UserAccount, HistoryItem, Alert } from '../types';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
-const CURRENT_USER_SESSION_KEY = 'welloh_current_user_email';
+interface SignUpData {
+    fullName: string;
+    email: string;
+    password: string;
+    country: string;
+    institution: string;
+}
 
 interface AuthContextType {
-  currentUser: User | null;
-  currentUserAccount: UserAccount | null;
-  login: (email: string, password_provided: string) => Promise<void>;
-  signup: (fullName: string, email: string, password_provided: string) => Promise<void>;
-  logout: () => void;
-  updateCurrentUserAccount: (updates: Partial<UserAccount>) => Promise<void>;
-  getAllUserAccounts: () => Promise<UserAccount[]>;
-  getUserAccountById: (id: string) => Promise<UserAccount | undefined>;
+    currentUser: User | null;
+    currentUserAccount: UserAccount | null;
+    isLoading: boolean;
+    login: (email: string, password: string) => Promise<void>;
+    signup: (signupData: Omit<SignUpData, 'password'> & {password: string}) => Promise<void>;
+    logout: () => Promise<void>;
+    updateCurrentUserAccount: (updates: Partial<UserAccount>) => Promise<void>;
+    getAllUserAccounts: () => Promise<UserAccount[]>;
+    getUserAccountById: (userId: string) => Promise<UserAccount | null>;
+    addHistoryItem: (item: Omit<HistoryItem, 'id' | 'timestamp'>) => Promise<void>;
+    clearHistory: () => Promise<void>;
+    addAlert: (alertData: Omit<Alert, 'id'>) => Promise<void>;
+    removeAlert: (alertId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [currentUserAccount, setCurrentUserAccount] = useState<UserAccount | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        // On initial load, check for a logged-in user in sessionStorage
-        const loggedInUserEmail = sessionStorage.getItem(CURRENT_USER_SESSION_KEY);
-        if (loggedInUserEmail) {
-            db.getUserByEmail(loggedInUserEmail).then(user => {
-                if (user) {
-                    setCurrentUserAccount(user);
+    const fetchUserAccount = useCallback(async (supabaseUser: SupabaseUser | null) => {
+        if (supabaseUser) {
+            try {
+                // Rely entirely on the backend trigger to have created the account.
+                const account = await getUserAccount(supabaseUser.id);
+                
+                if (account) {
+                    const userWithEmail: User = {
+                        id: account.id,
+                        email: supabaseUser.email,
+                        fullName: account.fullName,
+                        role: account.role,
+                    };
+
+                    const accountWithEmail: UserAccount = {
+                        ...account,
+                        email: supabaseUser.email,
+                    };
+
+                    setCurrentUser(userWithEmail);
+                    setCurrentUserAccount(accountWithEmail);
+                } else {
+                    // This can happen if the trigger fails or is slow.
+                    // We log an error and don't log the user in to avoid an inconsistent state.
+                    console.error(`User account for ${supabaseUser.id} not found. The creation trigger might have failed.`);
+                    setCurrentUser(null);
+                    setCurrentUserAccount(null);
                 }
-            });
+
+            } catch (e: any) {
+                 console.error("Failed to fetch user account:", e.message);
+                 await supabase?.auth.signOut(); // Sign out on failure
+                 setCurrentUser(null);
+                 setCurrentUserAccount(null);
+            }
+        } else {
+            setCurrentUser(null);
+            setCurrentUserAccount(null);
         }
-    }, []);
-
-    const login = async (email: string, password_provided: string): Promise<void> => {
-        const user = await db.getUserByEmail(email);
-
-        if (!user || user.password !== password_provided) {
-            throw new Error("Email ou mot de passe invalide.");
-        }
-        
-        sessionStorage.setItem(CURRENT_USER_SESSION_KEY, user.email);
-        setCurrentUserAccount(user);
-    };
-
-    const signup = async (fullName: string, email: string, password_provided: string): Promise<void> => {
-        const existingUser = await db.getUserByEmail(email);
-        if (existingUser) {
-            throw new Error("Un compte avec cet email existe déjà.");
-        }
-
-        const newUserAccountData = {
-            fullName,
-            email,
-            password: password_provided, // Again, don't do this in production
-            role: 'user' as const,
-            portfolio: {
-                cash: 100000,
-                holdings: [],
-                initialValue: 100000,
-                winRate: "N/A",
-                avgGainLoss: "N/A",
-                sharpeRatio: "N/A"
-            },
-            transactions: [],
-            watchlist: [],
-        };
-        
-        const newUser = await db.createUser(newUserAccountData);
-
-        sessionStorage.setItem(CURRENT_USER_SESSION_KEY, newUser.email);
-        setCurrentUserAccount(newUser);
-    };
-
-    const logout = () => {
-        sessionStorage.removeItem(CURRENT_USER_SESSION_KEY);
-        setCurrentUserAccount(null);
-        window.location.hash = 'landing';
-    };
-
-    const updateCurrentUserAccount = useCallback(async (updates: Partial<UserAccount>) => {
-        if (!currentUserAccount) return;
-
-        const updatedAccount = await db.updateUser(currentUserAccount.id, updates);
-        setCurrentUserAccount(updatedAccount);
-        
-    }, [currentUserAccount]);
-
-    const getAllUserAccounts = useCallback(async (): Promise<UserAccount[]> => {
-        return await db.getAllUsers();
-    }, []);
-
-    const getUserAccountById = useCallback(async (id: string): Promise<UserAccount | undefined> => {
-        return await db.getUserById(id);
+        setIsLoading(false);
     }, []);
     
-    // currentUser is a subset of currentUserAccount for public consumption
-    const currentUser: User | null = currentUserAccount ? {
-        id: currentUserAccount.id,
-        email: currentUserAccount.email,
-        fullName: currentUserAccount.fullName,
-        role: currentUserAccount.role
-    } : null;
+    useEffect(() => {
+        if (!supabase) {
+            setIsLoading(false);
+            return;
+        }
 
-    return (
-        <AuthContext.Provider value={{ currentUser, currentUserAccount, login, signup, logout, updateCurrentUserAccount, getAllUserAccounts, getUserAccountById }}>
-            {children}
-        </AuthContext.Provider>
-    );
+        const getInitialSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            await fetchUserAccount(session?.user ?? null);
+        };
+
+        getInitialSession();
+        
+        const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            await fetchUserAccount(session?.user ?? null);
+        });
+
+        return () => {
+            authListener?.subscription.unsubscribe();
+        };
+    }, [fetchUserAccount]);
+
+    const login = async (email: string, password: string) => {
+        if (!supabase) throw new Error("Supabase client is not initialized.");
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+            if (error.message.includes("Invalid login credentials")) {
+                throw new Error("L'adresse e-mail ou le mot de passe est incorrect.");
+            }
+            throw new Error(error.message);
+        }
+    };
+
+    const signup = async (signupData: SignUpData) => {
+        if (!supabase) throw new Error("Supabase client is not initialized.");
+        
+        const { fullName, email, password, country, institution } = signupData;
+
+        const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: fullName,
+                    country,
+                    institution,
+                }
+            }
+        });
+
+        if (signUpError) {
+            if (signUpError.message.includes("User already registered")) {
+                throw new Error("Un utilisateur avec cette adresse e-mail existe déjà.");
+            }
+            throw new Error(signUpError.message);
+        }
+    };
+
+    const logout = async () => {
+        if (!supabase) throw new Error("Supabase client is not initialized.");
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        setCurrentUser(null);
+        setCurrentUserAccount(null);
+    };
+    
+    const updateCurrentUserAccount = async (updates: Partial<UserAccount>) => {
+        if (!currentUserAccount) return;
+        const updatedAccount = await updateUserAccount(currentUserAccount.id, updates);
+        if (updatedAccount) {
+            // Re-add email from auth context, as updateUserAccount returns from DB without it
+            const accountWithEmail: UserAccount = {
+                ...updatedAccount,
+                email: currentUserAccount.email,
+            };
+            setCurrentUserAccount(accountWithEmail);
+        }
+    };
+    
+    const getAllUserAccounts = async (): Promise<UserAccount[]> => {
+        return await getAllUsers();
+    };
+
+    const getUserAccountById = async (userId: string): Promise<UserAccount | null> => {
+        return await getUserAccount(userId);
+    };
+
+    const addHistoryItem = async (item: Omit<HistoryItem, 'id' | 'timestamp'>) => {
+        if (!currentUser) return;
+        const newItem = await dbAddAnalysisHistory(currentUser.id, item);
+        if (newItem && currentUserAccount) {
+            const updatedHistory = [newItem, ...currentUserAccount.analysisHistory].slice(0, 20);
+            setCurrentUserAccount(prev => prev ? { ...prev, analysisHistory: updatedHistory } : null);
+        }
+    };
+
+    const clearHistory = async () => {
+        if (!currentUser) return;
+        const success = await dbClearAnalysisHistory(currentUser.id);
+        if (success && currentUserAccount) {
+            setCurrentUserAccount(prev => prev ? { ...prev, analysisHistory: [] } : null);
+        }
+    };
+
+    const addAlert = async (alertData: Omit<Alert, 'id'>) => {
+        if (!currentUser) return;
+        const newAlert = await dbAddAlert(currentUser.id, alertData);
+        if (newAlert && currentUserAccount) {
+            setCurrentUserAccount(prev => prev ? { ...prev, alerts: [...prev.alerts, newAlert] } : null);
+        }
+    };
+    
+    const removeAlert = async (alertId: string) => {
+        if (!currentUser) return;
+        const success = await dbRemoveAlert(alertId);
+        if (success && currentUserAccount) {
+            const updatedAlerts = currentUserAccount.alerts.filter(a => a.id !== alertId);
+            setCurrentUserAccount(prev => prev ? { ...prev, alerts: updatedAlerts } : null);
+        }
+    };
+
+    const value = {
+        currentUser,
+        currentUserAccount,
+        isLoading,
+        login,
+        signup,
+        logout,
+        updateCurrentUserAccount,
+        getAllUserAccounts,
+        getUserAccountById,
+        addHistoryItem,
+        clearHistory,
+        addAlert,
+        removeAlert,
+    };
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) {
+    if (context === undefined) {
         throw new Error('useAuth must be used within an AuthProvider');
     }
     return context;

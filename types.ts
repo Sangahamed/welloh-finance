@@ -1,4 +1,4 @@
-
+import React from 'react';
 
 export interface Metric {
   label: string;
@@ -61,10 +61,11 @@ export interface MarketIndex {
 
 export interface StockHolding {
   ticker: string;
+  exchange: string;
   companyName: string;
   shares: number;
   purchasePrice: number;
-  currentValue: number;
+  currentValue?: number;
 }
 
 export interface Portfolio {
@@ -95,6 +96,7 @@ export interface Transaction {
     id: string;
     type: 'buy' | 'sell';
     ticker: string;
+    exchange: string;
     companyName: string;
     shares: number;
     price: number;
@@ -107,18 +109,39 @@ export interface HistoricalPricePoint {
     price: number;
 }
 
+// New type for Public Tenders
+export interface PublicTender {
+  id: string;
+  title: string;
+  country: string;
+  sector: string;
+  issuingEntity: string;
+  summary: string;
+  deadline: string;
+  uri: string;
+}
+
+
 // New types for authentication
 export interface User {
   id: string;
-  email: string;
+  email?: string;
   fullName: string;
   role: 'user' | 'admin';
 }
 
-// This is the structure stored in localStorage for a user
+export interface WatchlistItem {
+  ticker: string;
+  exchange: string;
+}
+
+// This is the structure stored in the database for a user's profile
 export interface UserAccount extends User {
-    password?: string; // Stored only for mock auth, not for production
     portfolio: Portfolio;
     transactions: Transaction[];
-    watchlist: string[];
+    watchlist: WatchlistItem[];
+    analysisHistory: HistoryItem[];
+    alerts: Alert[];
+    country?: string;
+    institution?: string;
 }
