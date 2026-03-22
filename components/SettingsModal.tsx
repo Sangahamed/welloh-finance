@@ -1,6 +1,7 @@
-import React, { Fragment } from 'react';
+import React from 'react';
 import { useSettings, LineType } from '../contexts/SettingsContext';
 import { Cog6ToothIcon, XMarkIcon } from './icons/Icons';
+import NeonButton from './ui/NeonButton';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -21,96 +22,150 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   
   const lineTypes: { value: LineType, label: string }[] = [
     { value: 'monotone', label: 'Monotone' },
-    { value: 'linear', label: 'Linéaire' },
+    { value: 'linear', label: 'Lineaire' },
     { value: 'step', label: 'En escalier' },
   ];
 
   return (
     <div 
-        className="fixed inset-0 bg-gray-600 bg-opacity-75 flex justify-center items-center z-50 transition-opacity"
-        aria-labelledby="modal-title"
-        role="dialog"
-        aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
     >
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md m-4 transform transition-all">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center" id="modal-title">
-                    <Cog6ToothIcon className="h-6 w-6 mr-2"/>
-                    Paramètres
-                </h2>
-                <button
-                    onClick={onClose}
-                    className="p-1 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    aria-label="Fermer les paramètres"
-                >
-                    <XMarkIcon className="h-6 w-6" />
-                </button>
-            </div>
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+      />
 
-            <div className="space-y-6">
-                <fieldset>
-                    <legend className="text-lg font-semibold text-indigo-600 dark:text-indigo-400 mb-2">
-                        Personnalisation du Graphique
-                    </legend>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <label htmlFor="revenue-color" className="text-gray-700 dark:text-gray-300">Couleur des Revenus</label>
-                            <input 
-                                type="color" 
-                                id="revenue-color" 
-                                value={revenueColor}
-                                onChange={(e) => handleSettingChange('revenueColor', e.target.value)}
-                                className="w-10 h-10 p-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md cursor-pointer"
-                            />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <label htmlFor="profit-color" className="text-gray-700 dark:text-gray-300">Couleur des Bénéfices</label>
-                            <input 
-                                type="color" 
-                                id="profit-color" 
-                                value={profitColor}
-                                onChange={(e) => handleSettingChange('profitColor', e.target.value)}
-                                className="w-10 h-10 p-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md cursor-pointer"
-                            />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <label htmlFor="line-type" className="text-gray-700 dark:text-gray-300">Type de Ligne</label>
-                             <select
-                                id="line-type"
-                                value={lineType}
-                                onChange={(e) => handleSettingChange('lineType', e.target.value)}
-                                className="w-1/2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-gray-800 dark:text-gray-200 focus:border-indigo-500 focus:ring-indigo-500"
-                            >
-                                {lineTypes.map(lt => (
-                                    <option key={lt.value} value={lt.value}>{lt.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                         <div className="flex items-center justify-between">
-                            <label htmlFor="show-grid" className="text-gray-700 dark:text-gray-300">Afficher la Grille</label>
-                            <label htmlFor="show-grid" className="relative inline-flex items-center cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    id="show-grid"
-                                    checked={showGrid}
-                                    onChange={(e) => handleSettingChange('showGrid', e.target.checked)}
-                                    className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
-                            </label>
-                        </div>
-                    </div>
-                </fieldset>
+      {/* Modal */}
+      <div className="relative w-full max-w-md glass-card rounded-2xl p-6 animate-scale-in">
+        {/* Glow effect */}
+        <div className="absolute inset-0 rounded-2xl opacity-50 blur-xl -z-10"
+          style={{ background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(0, 255, 255, 0.2))' }}
+        />
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-neon-violet/20 flex items-center justify-center">
+              <Cog6ToothIcon className="w-5 h-5 text-neon-violet" />
             </div>
-             <div className="mt-6 text-right">
-                <button
-                    onClick={onClose}
-                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
-                >
-                    Terminé
-                </button>
-            </div>
+            <h2 className="text-xl font-display font-bold text-white" id="modal-title">
+              Parametres
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Fermer les parametres"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
         </div>
+
+        {/* Settings Content */}
+        <div className="space-y-6">
+          <fieldset>
+            <legend className="text-sm font-display font-semibold text-neon-cyan uppercase tracking-wider mb-4">
+              Personnalisation du Graphique
+            </legend>
+            
+            <div className="space-y-4">
+              {/* Revenue Color */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-dark-700/50 border border-white/5">
+                <label htmlFor="revenue-color" className="text-gray-300">
+                  Couleur des Revenus
+                </label>
+                <div className="relative">
+                  <input 
+                    type="color" 
+                    id="revenue-color" 
+                    value={revenueColor}
+                    onChange={(e) => handleSettingChange('revenueColor', e.target.value)}
+                    className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-2 border-white/20 hover:border-neon-cyan/50 transition-colors"
+                  />
+                  <div 
+                    className="absolute inset-0 rounded-lg pointer-events-none"
+                    style={{ boxShadow: `0 0 15px ${revenueColor}40` }}
+                  />
+                </div>
+              </div>
+
+              {/* Profit Color */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-dark-700/50 border border-white/5">
+                <label htmlFor="profit-color" className="text-gray-300">
+                  Couleur des Benefices
+                </label>
+                <div className="relative">
+                  <input 
+                    type="color" 
+                    id="profit-color" 
+                    value={profitColor}
+                    onChange={(e) => handleSettingChange('profitColor', e.target.value)}
+                    className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-2 border-white/20 hover:border-neon-cyan/50 transition-colors"
+                  />
+                  <div 
+                    className="absolute inset-0 rounded-lg pointer-events-none"
+                    style={{ boxShadow: `0 0 15px ${profitColor}40` }}
+                  />
+                </div>
+              </div>
+
+              {/* Line Type */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-dark-700/50 border border-white/5">
+                <label htmlFor="line-type" className="text-gray-300">
+                  Type de Ligne
+                </label>
+                <select
+                  id="line-type"
+                  value={lineType}
+                  onChange={(e) => handleSettingChange('lineType', e.target.value)}
+                  className="px-4 py-2 rounded-lg bg-dark-600 border border-white/10 text-white focus:border-neon-cyan focus:outline-none focus:ring-1 focus:ring-neon-cyan/50 transition-all cursor-pointer"
+                >
+                  {lineTypes.map(lt => (
+                    <option key={lt.value} value={lt.value} className="bg-dark-800">
+                      {lt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Show Grid Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-dark-700/50 border border-white/5">
+                <label htmlFor="show-grid" className="text-gray-300">
+                  Afficher la Grille
+                </label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showGrid}
+                  onClick={() => handleSettingChange('showGrid', !showGrid)}
+                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-neon-cyan/50 ${
+                    showGrid 
+                      ? 'bg-gradient-to-r from-neon-cyan to-neon-violet' 
+                      : 'bg-dark-600 border border-white/10'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform duration-300 ${
+                      showGrid ? 'translate-x-8' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-8 flex justify-end">
+          <NeonButton color="cyan" onClick={onClose}>
+            Termine
+          </NeonButton>
+        </div>
+      </div>
     </div>
   );
 };
