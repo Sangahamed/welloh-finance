@@ -238,14 +238,43 @@ const HoldingsTable: React.FC<{ holdings: StockHolding[] }> = ({ holdings }) => 
 
 // Transaction History Component - Neon style
 export const TransactionHistory: React.FC<{ transactions: Transaction[] }> = ({ transactions }) => {
+  const exportCSV = () => {
+    const headers = ['Date', 'Type', 'Ticker', 'Bourse', 'Quantité', 'Prix ($)', 'Total ($)'];
+    const rows = [...transactions].reverse().map(t => [
+      new Date(t.timestamp).toLocaleDateString('fr-FR'),
+      t.type === 'buy' ? 'Achat' : 'Vente',
+      t.ticker,
+      t.exchange,
+      t.shares,
+      t.price.toFixed(2),
+      (t.shares * t.price).toFixed(2),
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `welloh_transactions_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <NeonCard variant="default" className="p-6">
-      <h3 className="text-lg font-bold text-white flex items-center gap-3 mb-4">
-        <div className="p-2 rounded-lg bg-neon-violet/10 border border-neon-violet/30">
-          <ClockIcon className="w-5 h-5 text-neon-violet" />
-        </div>
-        Historique
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-neon-violet/10 border border-neon-violet/30">
+            <ClockIcon className="w-5 h-5 text-neon-violet" />
+          </div>
+          Historique
+        </h3>
+        {transactions.length > 0 && (
+          <button onClick={exportCSV}
+            className="text-xs font-medium text-neon-green hover:text-white px-3 py-1.5 rounded-lg bg-neon-green/10 border border-neon-green/30 hover:bg-neon-green/20 transition-all">
+            ↓ CSV
+          </button>
+        )}
+      </div>
       <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
         {transactions.length > 0 ? transactions.slice().reverse().slice(0, 10).map((t, index) => {
           const isBuy = t.type === 'buy';

@@ -185,3 +185,29 @@ export interface UserAccount extends User {
     country?: string;
     institution?: string;
 }
+
+// Badge system types
+export interface BadgeDefinition {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    category: 'trading' | 'performance' | 'education' | 'prediction' | 'social';
+    color: 'cyan' | 'green' | 'violet' | 'magenta' | 'orange' | 'yellow';
+    condition: (account: UserAccount) => boolean;
+    rarity: 'common' | 'rare' | 'epic' | 'legendary';
+}
+
+export interface EarnedBadge {
+    id: string;
+    earnedAt: number;
+}
+
+// Post-trade AI feedback
+export interface TradeFeedback {
+    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    summary: string;
+    strengths: string[];
+    improvements: string[];
+    advice: string;
+}

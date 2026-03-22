@@ -273,6 +273,50 @@ export const generatePredictionIdeas = async (category: string): Promise<{ title
     }
 };
 
+export const getPostTradeFeedback = async (
+    tradeType: 'buy' | 'sell',
+    ticker: string,
+    shares: number,
+    price: number,
+    orderType: string,
+    portfolioCash: number,
+    portfolioValue: number,
+    recommendation: string,
+    confidenceScore: number
+): Promise<{ grade: string; summary: string; strengths: string[]; improvements: string[]; advice: string }> => {
+    const totalCost = shares * price;
+    const portfolioAllocation = portfolioValue > 0 ? ((totalCost / portfolioValue) * 100).toFixed(1) : '0';
+    const prompt = `Tu es un mentor financier expert. Un utilisateur vient d'effectuer le trade suivant :
+- Action : ${ticker}
+- Type : ${tradeType === 'buy' ? 'Achat' : 'Vente'}
+- Quantité : ${shares} actions
+- Prix : $${price.toFixed(2)}
+- Type d'ordre : ${orderType}
+- Coût total : $${totalCost.toFixed(2)}
+- Allocation du portefeuille : ${portfolioAllocation}%
+- Cash restant après trade : $${portfolioCash.toFixed(2)}
+- Recommandation IA sur ce titre : ${recommendation} (confiance : ${confidenceScore}%)
+
+Analyse cette décision de trading et fournis un feedback pédagogique. Réponds UNIQUEMENT en JSON valide sans markdown :
+{
+  "grade": "A" | "B" | "C" | "D" | "F",
+  "summary": "Résumé court de la décision (1-2 phrases)",
+  "strengths": ["point fort 1", "point fort 2"],
+  "improvements": ["point à améliorer 1", "point à améliorer 2"],
+  "advice": "Conseil concret pour le prochain trade (1 phrase)"
+}`;
+    try {
+        const response = await getAI().models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        const jsonText = cleanJsonString(response.text);
+        return JSON.parse(jsonText);
+    } catch (error) {
+        handleApiError(error, "Impossible de générer le feedback post-trade.");
+    }
+};
+
 export const getEducationalContentStream = async (topic: string) => {
     const prompt = `En tant qu'éducateur financier expert, rédige un article clair et concis sur le sujet suivant : "${topic}".
     L'article doit être bien structuré, facile à comprendre pour un public varié (allant du débutant à l'intermédiaire), et utiliser le format Markdown.

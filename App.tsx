@@ -18,6 +18,7 @@ import ProfileView from './components/ProfileView';
 import PublicTendersView from './components/PublicTendersView';
 import LeaderboardView from './components/LeaderboardView';
 import PredictionsView from './components/PredictionsView';
+import BadgesView from './components/BadgesView';
 
 const App: React.FC = () => {
     const { currentUser, isLoading } = useAuth();
@@ -96,6 +97,8 @@ const App: React.FC = () => {
                 return <PublicTendersView />;
             case 'predictions':
                 return <PredictionsView />;
+            case 'badges':
+                return <BadgesView />;
             case 'leaderboard':
                 return <LeaderboardView onNavigate={handleNavigate} />;
             case 'admin':

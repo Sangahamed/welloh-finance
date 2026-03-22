@@ -36,6 +36,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
     { id: 'education', label: 'Apprendre' },
     { id: 'predictions', label: 'Prédictions' },
     { id: 'leaderboard', label: 'Classement' },
+    { id: 'badges', label: 'Badges' },
     { id: 'tenders', label: 'Opportunités' },
   ];
 
