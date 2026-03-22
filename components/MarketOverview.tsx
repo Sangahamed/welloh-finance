@@ -1,6 +1,8 @@
 import React from 'react';
 import type { MarketIndex } from '../types';
 import { ArrowUpIcon, ArrowDownIcon, ChartTrendingUpIcon } from './icons/Icons';
+import NeonCard from './ui/NeonCard';
+import NeonBadge from './ui/NeonBadge';
 
 interface MarketOverviewProps {
   indices: MarketIndex[] | null;
@@ -8,63 +10,89 @@ interface MarketOverviewProps {
   error: string | null;
 }
 
-const IndexCard: React.FC<{ index: MarketIndex }> = ({ index }) => {
-    const { name, value, change, percentChange, changeType } = index;
+const IndexCard: React.FC<{ index: MarketIndex; delay: number }> = ({ index, delay }) => {
+  const { name, value, change, percentChange, changeType } = index;
+  
+  const isPositive = changeType === 'positive';
+  const isNegative = changeType === 'negative';
 
-    const changeColorClass = {
-        positive: 'text-green-600 dark:text-green-400',
-        negative: 'text-red-600 dark:text-red-400',
-        neutral: 'text-gray-500 dark:text-gray-400',
-    }[changeType || 'neutral'];
-
-    const renderChangeIcon = () => {
-        if (changeType === 'positive') return <ArrowUpIcon className="h-4 w-4" />;
-        if (changeType === 'negative') return <ArrowDownIcon className="h-4 w-4" />;
-        return null;
-    };
-
-    return (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{name}</h4>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{value}</p>
-            <div className={`flex items-center text-sm mt-2 font-semibold ${changeColorClass}`}>
-                {renderChangeIcon()}
-                <span className="ml-1">{change} ({percentChange})</span>
+  return (
+    <div 
+      className="animate-fade-in"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <NeonCard 
+        variant={isPositive ? 'green' : isNegative ? 'default' : 'default'}
+        className="p-4 h-full"
+        hover
+      >
+        <div className="flex items-start justify-between mb-2">
+          <h4 className="text-sm font-medium text-gray-400 truncate pr-2">{name}</h4>
+          {changeType !== 'neutral' && (
+            <div className={`
+              w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0
+              ${isPositive ? 'bg-neon-green/20' : 'bg-red-500/20'}
+            `}>
+              {isPositive ? (
+                <ArrowUpIcon className="w-3 h-3 text-neon-green" />
+              ) : (
+                <ArrowDownIcon className="w-3 h-3 text-red-400" />
+              )}
             </div>
+          )}
         </div>
-    );
+        
+        <p className="text-xl lg:text-2xl font-bold text-white mb-2 font-display">
+          {value}
+        </p>
+        
+        <div className={`
+          flex items-center gap-1 text-sm font-semibold
+          ${isPositive ? 'text-neon-green' : isNegative ? 'text-red-400' : 'text-gray-500'}
+        `}>
+          <span>{change}</span>
+          <span className="text-xs opacity-75">({percentChange})</span>
+        </div>
+      </NeonCard>
+    </div>
+  );
 };
 
-const SkeletonCard: React.FC = () => (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 animate-pulse">
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
-        <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-1/2 mb-3"></div>
-        <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
-    </div>
+const SkeletonCard: React.FC<{ delay: number }> = ({ delay }) => (
+  <div 
+    className="rounded-xl p-4 h-28 skeleton"
+    style={{ animationDelay: `${delay}ms` }}
+  />
 );
 
-
 const MarketOverview: React.FC<MarketOverviewProps> = ({ indices, isLoading, error }) => {
-    return (
-        <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
-                <ChartTrendingUpIcon className="h-7 w-7 mr-2 text-indigo-600 dark:text-indigo-400" />
-                Aperçu du Marché
-            </h2>
-            {error && (
-                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
-                    <p>{error}</p>
-                </div>
-            )}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {isLoading ? (
-                    [...Array(5)].map((_, i) => <SkeletonCard key={i} />)
-                ) : (
-                    indices && indices.map(index => <IndexCard key={index.name} index={index} />)
-                )}
-            </div>
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30">
+          <ChartTrendingUpIcon className="w-5 h-5 text-neon-cyan" />
         </div>
-    );
+        <h2 className="text-xl font-bold text-white">Apercu du Marche</h2>
+        <NeonBadge variant="cyan" size="xs">En direct</NeonBadge>
+      </div>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl mb-4 animate-fade-in">
+          <p>{error}</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {isLoading ? (
+          [...Array(5)].map((_, i) => <SkeletonCard key={i} delay={i * 100} />)
+        ) : (
+          indices?.map((index, i) => (
+            <IndexCard key={index.name} index={index} delay={i * 100} />
+          ))
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default MarketOverview;
