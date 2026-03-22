@@ -122,6 +122,46 @@ export interface PublicTender {
 }
 
 
+// Prediction Market types (Phase 2)
+export interface PredictionOption {
+  id: string;
+  label: string;
+  probability: number; // 0-100
+}
+
+export interface Prediction {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  title: string;
+  description: string;
+  category: 'stocks' | 'crypto' | 'macro' | 'africa' | 'other';
+  options: PredictionOption[];
+  expiresAt: string; // ISO date string
+  resolvedOptionId: string | null;
+  status: 'active' | 'resolved' | 'expired';
+  totalPool: number; // total tokens bet
+  createdAt: string;
+  analysisProof: string; // required analysis rationale
+  participantsCount: number;
+}
+
+export interface Bet {
+  id: string;
+  predictionId: string;
+  userId: string;
+  optionId: string;
+  amount: number;
+  createdAt: string;
+}
+
+export interface League {
+  name: string;
+  minScore: number;
+  color: 'cyan' | 'green' | 'violet' | 'magenta' | 'orange' | 'yellow';
+  icon: string;
+}
+
 // New types for authentication
 export interface User {
   id: string;

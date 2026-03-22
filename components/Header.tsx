@@ -34,8 +34,9 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
     { id: 'analysis', label: 'Analyse' },
     { id: 'strategy', label: 'Mentor IA' },
     { id: 'education', label: 'Apprendre' },
+    { id: 'predictions', label: 'Prédictions' },
     { id: 'leaderboard', label: 'Classement' },
-    { id: 'tenders', label: 'Opportunites' },
+    { id: 'tenders', label: 'Opportunités' },
   ];
 
   const adminNavItems = [

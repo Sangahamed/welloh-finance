@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { UserAccount, StockHolding, Transaction, WatchlistItem, HistoryItem, Alert } from '../types';
+import type { UserAccount, StockHolding, Transaction, WatchlistItem, HistoryItem, Alert, Prediction, Bet } from '../types';
 
 /**
  * Fetches all necessary user data from the new database schema and assembles it
@@ -296,3 +296,122 @@ export const removeAlert = async (alertId: string): Promise<boolean> => {
     }
     return true;
 };
+
+// ─── Prediction Market Functions ──────────────────────────────────────────────
+
+export const getPredictions = async (): Promise<Prediction[]> => {
+    if (!supabase) return [];
+    try {
+        const { data, error } = await supabase
+            .from('predictions')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapPrediction);
+    } catch (e) {
+        console.error("Error fetching predictions:", e);
+        return [];
+    }
+};
+
+export const createPrediction = async (
+    userId: string,
+    creatorName: string,
+    payload: Omit<Prediction, 'id' | 'creatorId' | 'creatorName' | 'status' | 'totalPool' | 'createdAt' | 'participantsCount' | 'resolvedOptionId'>
+): Promise<Prediction | null> => {
+    if (!supabase) return null;
+    try {
+        const { data, error } = await supabase
+            .from('predictions')
+            .insert({
+                creator_id: userId,
+                creator_name: creatorName,
+                title: payload.title,
+                description: payload.description,
+                category: payload.category,
+                options: payload.options,
+                expires_at: payload.expiresAt,
+                analysis_proof: payload.analysisProof,
+                status: 'active',
+                total_pool: 0,
+                participants_count: 0,
+            })
+            .select()
+            .single();
+        if (error) throw error;
+        return mapPrediction(data);
+    } catch (e) {
+        console.error("Error creating prediction:", e);
+        return null;
+    }
+};
+
+export const placeBet = async (
+    userId: string,
+    predictionId: string,
+    optionId: string,
+    amount: number
+): Promise<Bet | null> => {
+    if (!supabase) return null;
+    try {
+        const { data, error } = await supabase
+            .from('bets')
+            .insert({ user_id: userId, prediction_id: predictionId, option_id: optionId, amount })
+            .select()
+            .single();
+        if (error) throw error;
+        await supabase.rpc('increment_prediction_pool', { p_id: predictionId, p_amount: amount });
+        return {
+            id: data.id,
+            predictionId: data.prediction_id,
+            userId: data.user_id,
+            optionId: data.option_id,
+            amount: data.amount,
+            createdAt: data.created_at,
+        };
+    } catch (e) {
+        console.error("Error placing bet:", e);
+        return null;
+    }
+};
+
+export const getUserBets = async (userId: string): Promise<Bet[]> => {
+    if (!supabase) return [];
+    try {
+        const { data, error } = await supabase
+            .from('bets')
+            .select('*')
+            .eq('user_id', userId);
+        if (error) throw error;
+        return (data || []).map(d => ({
+            id: d.id,
+            predictionId: d.prediction_id,
+            userId: d.user_id,
+            optionId: d.option_id,
+            amount: d.amount,
+            createdAt: d.created_at,
+        }));
+    } catch (e) {
+        console.error("Error fetching user bets:", e);
+        return [];
+    }
+};
+
+function mapPrediction(d: any): Prediction {
+    return {
+        id: d.id,
+        creatorId: d.creator_id,
+        creatorName: d.creator_name,
+        title: d.title,
+        description: d.description,
+        category: d.category,
+        options: d.options,
+        expiresAt: d.expires_at,
+        resolvedOptionId: d.resolved_option_id ?? null,
+        status: d.status,
+        totalPool: d.total_pool ?? 0,
+        createdAt: d.created_at,
+        analysisProof: d.analysis_proof,
+        participantsCount: d.participants_count ?? 0,
+    };
+}

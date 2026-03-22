@@ -249,6 +249,30 @@ export const generateStrategyStream = async (prompt: string) => {
     });
 };
 
+export const generatePredictionIdeas = async (category: string): Promise<{ title: string; description: string; options: string[]; analysisRationale: string }[]> => {
+    const prompt = `Tu es un expert des marchés financiers. Génère 3 idées de prédictions de marché dans la catégorie "${category}" adaptées à la plateforme Welloh (focus marchés africains et mondiaux).
+    La réponse doit être UNIQUEMENT un tableau JSON valide sans markdown avec la structure suivante pour chaque prédiction :
+    {
+        "title": string (question courte et précise, ex: "Le BRVM Composite dépassera 300 points d'ici fin 2025 ?"),
+        "description": string (contexte et enjeux, 2-3 phrases),
+        "options": string[] (tableau de 2-3 options possibles, ex: ["Oui", "Non"] ou ["Hausser", "Stable", "Baisser"]),
+        "analysisRationale": string (brève analyse justifiant la question)
+    }
+    Assure-toi que les prédictions sont réalistes, d'actualité, et axées sur l'Afrique si la catégorie s'y prête.`;
+    try {
+        const response = await getAI().models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+        });
+        const jsonText = cleanJsonString(response.text);
+        const data = JSON.parse(jsonText);
+        if (!Array.isArray(data)) throw new Error("Format invalide");
+        return data;
+    } catch (error) {
+        handleApiError(error, "Impossible de générer des idées de prédictions.");
+    }
+};
+
 export const getEducationalContentStream = async (topic: string) => {
     const prompt = `En tant qu'éducateur financier expert, rédige un article clair et concis sur le sujet suivant : "${topic}".
     L'article doit être bien structuré, facile à comprendre pour un public varié (allant du débutant à l'intermédiaire), et utiliser le format Markdown.

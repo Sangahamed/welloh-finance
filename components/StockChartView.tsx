@@ -41,7 +41,9 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
   const [error, setError] = useState<string | null>(null);
 
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
+  const [orderType, setOrderType] = useState<'market' | 'limit' | 'stop-loss'>('market');
   const [shares, setShares] = useState('');
+  const [limitPrice, setLimitPrice] = useState('');
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -86,7 +88,27 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
       return;
     }
 
-    const transactionCost = numShares * stockData.price;
+    // Determine execution price based on order type
+    let executionPrice = stockData.price;
+    if (orderType === 'limit' || orderType === 'stop-loss') {
+      const parsedLimitPrice = parseFloat(limitPrice);
+      if (isNaN(parsedLimitPrice) || parsedLimitPrice <= 0) {
+        alert("Veuillez entrer un prix valide pour l'ordre.");
+        return;
+      }
+      if (orderType === 'limit' && tradeType === 'buy' && parsedLimitPrice < stockData.price) {
+        alert(`Ordre limite placé à $${parsedLimitPrice.toFixed(2)}. Exécution simulée au prix limite.`);
+      } else if (orderType === 'limit' && tradeType === 'sell' && parsedLimitPrice > stockData.price) {
+        alert(`Ordre limite placé à $${parsedLimitPrice.toFixed(2)}. Exécution simulée au prix limite.`);
+      } else if (orderType === 'stop-loss') {
+        if (tradeType === 'sell' && parsedLimitPrice >= stockData.price) {
+          alert(`Stop-loss déclenché : le prix actuel ($${stockData.price.toFixed(2)}) a atteint votre seuil.`);
+        }
+      }
+      executionPrice = parsedLimitPrice;
+    }
+
+    const transactionCost = numShares * executionPrice;
     let { cash, holdings } = currentUserAccount.portfolio;
     
     const newTransaction: Transaction = {
@@ -96,7 +118,7 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
       exchange: stockData.exchange,
       companyName: stockData.companyName,
       shares: numShares,
-      price: stockData.price,
+      price: executionPrice,
       timestamp: Date.now(),
     };
 
@@ -112,15 +134,15 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
         const existing = holdings[existingHoldingIndex];
         const newTotalShares = existing.shares + numShares;
         const newPurchasePrice = ((existing.purchasePrice * existing.shares) + transactionCost) / newTotalShares;
-        holdings[existingHoldingIndex] = { ...existing, shares: newTotalShares, purchasePrice: newPurchasePrice, currentValue: stockData.price };
+        holdings[existingHoldingIndex] = { ...existing, shares: newTotalShares, purchasePrice: newPurchasePrice, currentValue: executionPrice };
       } else {
         holdings.push({
           ticker: stockData.ticker,
           exchange: stockData.exchange,
           companyName: stockData.companyName,
           shares: numShares,
-          purchasePrice: stockData.price,
-          currentValue: stockData.price,
+          purchasePrice: executionPrice,
+          currentValue: executionPrice,
         });
       }
     } else {
@@ -142,8 +164,10 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
         transactions: [...currentUserAccount.transactions, newTransaction]
       });
 
-      alert(`Transaction reussie !`);
+      const orderLabel = orderType === 'market' ? 'Marché' : orderType === 'limit' ? 'Limite' : 'Stop-Loss';
+      alert(`Ordre ${orderLabel} exécuté : ${tradeType === 'buy' ? 'Achat' : 'Vente'} de ${numShares} ${stockData.ticker} à $${executionPrice.toFixed(2)}`);
       setShares('');
+      setLimitPrice('');
     } catch (err) {
       console.error("Echec de la transaction:", err);
       alert(`La transaction a echoue: ${err instanceof Error ? err.message : 'Une erreur inconnue est survenue.'}`);
@@ -318,7 +342,7 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
         {/* Trade Panel */}
         <div className="p-4 rounded-xl bg-white/5 border border-white/10">
           <h4 className="font-bold text-white mb-4">Passer un Ordre</h4>
-          <form onSubmit={handleTrade} className="space-y-4">
+          <form onSubmit={handleTrade} className="space-y-3">
             {/* Buy/Sell Toggle */}
             <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-dark-700/50">
               <button 
@@ -349,9 +373,41 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
               </button>
             </div>
 
+            {/* Order Type Selector */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Type d'ordre</label>
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-dark-700/50">
+                {(['market', 'limit', 'stop-loss'] as const).map(ot => (
+                  <button
+                    key={ot}
+                    type="button"
+                    onClick={() => { setOrderType(ot); setLimitPrice(''); }}
+                    className={`
+                      px-2 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300
+                      ${orderType === ot
+                        ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30'
+                        : 'text-gray-400 hover:text-white'
+                      }
+                    `}
+                  >
+                    {ot === 'market' ? 'Marché' : ot === 'limit' ? 'Limite' : 'Stop-Loss'}
+                  </button>
+                ))}
+              </div>
+              {orderType !== 'market' && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {orderType === 'limit'
+                    ? tradeType === 'buy'
+                      ? 'Achat exécuté au prix cible ou inférieur.'
+                      : 'Vente exécutée au prix cible ou supérieur.'
+                    : 'Vente automatique si le cours tombe sous le seuil.'}
+                </p>
+              )}
+            </div>
+
             {/* Quantity Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Quantite</label>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Quantité</label>
               <input
                 type="number"
                 value={shares}
@@ -369,14 +425,47 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
               />
             </div>
 
+            {/* Limit/Stop Price Input */}
+            {orderType !== 'market' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  {orderType === 'limit' ? 'Prix limite ($)' : 'Prix stop-loss ($)'}
+                </label>
+                <input
+                  type="number"
+                  value={limitPrice}
+                  onChange={(e) => setLimitPrice(e.target.value)}
+                  step="0.01"
+                  min="0.01"
+                  placeholder={`Actuel: $${stockData.price.toFixed(2)}`}
+                  required
+                  className="
+                    w-full bg-dark-700/50 border border-neon-cyan/30 rounded-xl
+                    px-4 py-3 text-white placeholder-gray-500
+                    focus:border-neon-cyan focus:ring-0 focus:outline-none
+                    focus:shadow-lg focus:shadow-neon-cyan/20
+                    transition-all duration-300
+                  "
+                />
+              </div>
+            )}
+
             {/* Estimated Cost */}
             <div className="p-3 rounded-xl bg-dark-800/50 border border-white/5">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Cout estime</span>
+                <span className="text-sm text-gray-400">
+                  {orderType === 'market' ? 'Coût estimé' : 'Coût au prix cible'}
+                </span>
                 <span className="text-lg font-bold text-white">
-                  {formatCurrency(Number(shares || 0) * stockData.price)}
+                  {formatCurrency(Number(shares || 0) * (orderType === 'market' ? stockData.price : (parseFloat(limitPrice) || stockData.price)))}
                 </span>
               </div>
+              {orderType !== 'market' && limitPrice && (
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>Prix marché actuel</span>
+                  <span>{formatCurrency(stockData.price)}</span>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}
@@ -386,6 +475,7 @@ const StockChartView: React.FC<StockChartViewProps> = ({ ticker, onToggleWatchli
               size="lg"
               fullWidth
             >
+              {orderType === 'market' ? '' : orderType === 'limit' ? '⚡ ' : '🛡 '}
               {tradeType === 'buy' ? 'Acheter' : 'Vendre'} {shares || 0} actions
             </NeonButton>
           </form>

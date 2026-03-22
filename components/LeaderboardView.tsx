@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getStockData } from '../services/geminiService';
 import type { UserAccount } from '../types';
-import { TrophyIcon, StarIcon, ChartBarIcon, SparklesIcon, FireIcon } from './icons/Icons';
+import { TrophyIcon, StarIcon, ChartBarIcon, SparklesIcon, FireIcon, BoltIcon, RocketLaunchIcon } from './icons/Icons';
 import AnimatedBackground from './ui/AnimatedBackground';
 import NeonCard from './ui/NeonCard';
 import NeonBadge from './ui/NeonBadge';
@@ -12,6 +12,29 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD' }).format(value);
 };
 
+// Phase 2: Proper league system (Bronze → Silver → Gold → Sapphire → Diamond → Legend)
+const LEAGUES = [
+    { name: 'Bronze',   minScore: -Infinity, maxScore: 10,      badgeVariant: 'bronze' as const,  glow: '#FB923C', icon: StarIcon,           emoji: '🥉' },
+    { name: 'Silver',   minScore: 10,        maxScore: 25,      badgeVariant: 'silver' as const,  glow: '#94A3B8', icon: ChartBarIcon,       emoji: '🥈' },
+    { name: 'Gold',     minScore: 25,        maxScore: 50,      badgeVariant: 'gold' as const,    glow: '#FACC15', icon: TrophyIcon,         emoji: '🥇' },
+    { name: 'Sapphire', minScore: 50,        maxScore: 100,     badgeVariant: 'violet' as const,  glow: '#8B5CF6', icon: SparklesIcon,       emoji: '💎' },
+    { name: 'Diamond',  minScore: 100,       maxScore: 200,     badgeVariant: 'magenta' as const, glow: '#E879F9', icon: BoltIcon,           emoji: '⚡' },
+    { name: 'Legend',   minScore: 200,       maxScore: Infinity, badgeVariant: 'orange' as const, glow: '#F97316', icon: RocketLaunchIcon,   emoji: '🚀' },
+];
+
+// Composite score: PnL return % (weighted 50%) + Sharpe proxy (30%) + winRate (20%)
+function computeCompositeScore(returnPct: number, winRate: number, sharpe: number): number {
+    const pnlScore = Math.max(-20, Math.min(100, returnPct));
+    const sharpeScore = Math.max(0, Math.min(50, sharpe * 20));
+    const winScore = Math.max(0, Math.min(30, winRate * 30));
+    return pnlScore * 0.5 + sharpeScore * 0.3 + winScore * 0.2;
+}
+
+function getLeague(score: number) {
+    return [...LEAGUES].reverse().find(l => score >= l.minScore) ?? LEAGUES[0];
+}
+
+// Keep old level system for backward compat
 const levels = [
     { name: 'Novice', threshold: 0, color: 'cyan' as const, icon: StarIcon },
     { name: 'Apprenti', threshold: 110000, color: 'green' as const, icon: ChartBarIcon },
@@ -31,6 +54,9 @@ interface LeaderboardViewProps {
 type RankedUser = UserAccount & {
     portfolioValue: number;
     returnPercentage: number;
+    compositeScore: number;
+    league: typeof LEAGUES[number];
+    winRate: number;
     level: { name: string; color: 'cyan' | 'green' | 'violet' | 'magenta' | 'orange'; icon: React.FC<any> };
     rank: number;
 };
@@ -154,8 +180,6 @@ const LeaderboardRow: React.FC<{
     onNavigate: (page: string) => void;
     index: number;
 }> = ({ user, isCurrentUser, onNavigate, index }) => {
-    const LevelIcon = user.level.icon;
-    
     return (
         <div
             className={`
@@ -205,16 +229,26 @@ const LeaderboardRow: React.FC<{
                         <span className="ml-2 text-xs text-neon-cyan">(Vous)</span>
                     )}
                 </button>
-                <div className="flex items-center gap-2 mt-1">
-                    <NeonBadge color={user.level.color} size="sm" glow>
-                        <LevelIcon className="w-3 h-3 mr-1" />
-                        {user.level.name}
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <NeonBadge variant={user.league.badgeVariant} size="sm" glow>
+                        {user.league.emoji} {user.league.name}
                     </NeonBadge>
+                    {user.country && (
+                        <span className="text-xs text-gray-500">{user.country}</span>
+                    )}
                 </div>
             </div>
 
             {/* Stats */}
             <div className="hidden md:flex items-center gap-8">
+                {/* Composite Score */}
+                <div className="text-right">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Score</p>
+                    <p className="font-display font-bold text-neon-violet">
+                        {user.compositeScore.toFixed(1)}
+                    </p>
+                </div>
+
                 {/* Return Percentage */}
                 <div className="text-right">
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Rendement</p>
@@ -290,14 +324,29 @@ const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigate }) => {
                     const portfolioValue = user.portfolio.cash + holdingsValue;
                     const totalReturn = portfolioValue - user.portfolio.initialValue;
                     const returnPercentage = user.portfolio.initialValue > 0 ? (totalReturn / user.portfolio.initialValue) * 100 : 0;
+
+                    // Compute win rate from transactions
+                    const txns = user.transactions ?? [];
+                    const sells = txns.filter(t => t.type === 'sell');
+                    const winRate = sells.length > 0 ? sells.filter(t => t.price > t.price * 0.98).length / sells.length : 0.5;
+
+                    // Sharpe proxy (return / volatility assumed to be 10% for sim)
+                    const sharpe = returnPercentage / 10;
+
+                    const compositeScore = computeCompositeScore(returnPercentage, winRate, sharpe);
+                    const league = getLeague(compositeScore);
+
                     return {
                         ...user,
                         portfolioValue,
                         returnPercentage,
+                        compositeScore,
+                        league,
+                        winRate,
                         level: getLevel(portfolioValue),
                     };
                 })
-                .sort((a, b) => b.portfolioValue - a.portfolioValue)
+                .sort((a, b) => b.compositeScore - a.compositeScore)
                 .map((user, index) => ({ ...user, rank: index + 1 }));
 
                 setUsers(rankedUsers);
@@ -333,8 +382,8 @@ const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigate }) => {
                     </h1>
                     
                     <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                        Affrontez les meilleurs traders et grimpez dans le classement pour devenir un 
-                        <span className="text-neon-magenta font-semibold"> Maestro</span> du trading.
+                        Affrontez les meilleurs traders et grimpez les ligues pour atteindre le rang
+                        <span className="text-yellow-400 font-semibold"> 🚀 Legend</span>.
                     </p>
 
                     {/* Stats Summary */}
@@ -352,6 +401,19 @@ const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigate }) => {
                             <p className="text-sm text-gray-500">Volume Total</p>
                         </div>
                     </div>
+
+                    {/* League progression display */}
+                    <div className="flex flex-wrap justify-center gap-2 mt-6">
+                        {LEAGUES.map((l, i) => (
+                            <div key={l.name} className="flex items-center gap-1.5">
+                                <span className="text-lg">{l.emoji}</span>
+                                <span className="text-xs text-gray-400 font-medium">{l.name}</span>
+                                {i < LEAGUES.length - 1 && (
+                                    <span className="text-gray-600 mx-1">→</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 {isLoading ? (
@@ -360,7 +422,7 @@ const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigate }) => {
                         <p className="text-gray-400 animate-pulse">Chargement du classement...</p>
                     </div>
                 ) : error ? (
-                    <NeonCard color="magenta" className="text-center py-12">
+                    <NeonCard variant="magenta" className="text-center py-12">
                         <p className="text-red-400">{error}</p>
                     </NeonCard>
                 ) : (
@@ -397,7 +459,7 @@ const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onNavigate }) => {
                             ))}
 
                             {users.length === 0 && (
-                                <NeonCard color="cyan" className="text-center py-12">
+                                <NeonCard variant="cyan" className="text-center py-12">
                                     <SparklesIcon className="w-12 h-12 text-neon-cyan mx-auto mb-4" />
                                     <p className="text-gray-400">Aucun trader pour le moment. Soyez le premier!</p>
                                 </NeonCard>
