@@ -1,9 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 import type { StockData, MarketIndex, AnalysisData, NewsArticle, HistoricalPricePoint, PublicTender } from '../types';
 
-// L'initialisation se fait maintenant directement.
-// L'environnement d'exécution DOIT fournir process.env.API_KEY.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let _ai: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+    if (_ai) return _ai;
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error("La clé API Gemini n'est pas configurée. Veuillez définir la variable d'environnement GEMINI_API_KEY.");
+    }
+    _ai = new GoogleGenAI({ apiKey });
+    return _ai;
+}
 
 const cleanJsonString = (text: string): string => {
     let jsonText = text.trim();
@@ -68,7 +76,7 @@ export const getFinancialAnalysis = async (
     `;
   
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: "gemini-2.5-pro",
       contents: prompt,
       config: {
@@ -97,7 +105,7 @@ export const getStockData = async (
         La structure doit être : { "companyName": string, "ticker": string, "exchange": string, "price": number, "change": number, "percentChange": string, "volume": string, "summary": string (brève description de l'entreprise), "recommendation": "Acheter" | "Conserver" | "Vendre", "confidenceScore": number (0-100) }.
         Le prix doit être un nombre réaliste. Le volume doit être une chaîne de caractères formatée (ex: "1.25M"). Le 'percentChange' doit être une chaîne de caractères avec un signe (+ ou -) et un pourcentage (ex: "+1.25%").`;
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAI().models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
@@ -131,7 +139,7 @@ export const searchStocks = async (query: string): Promise<StockData[]> => {
         }
         Fournis des données réalistes mais fictives, basées sur des informations publiques récentes pour la crédibilité. Inclus une bonne variété d'actions, y compris des actions africaines si la requête est générale.`;
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAI().models.generateContent({
             model: "gemini-2.5-pro",
             contents: prompt,
             config: {
@@ -157,7 +165,7 @@ export const getHistoricalStockData = async (
 ): Promise<HistoricalPricePoint[]> => {
     const prompt = `Agis comme un simulateur de données boursières historiques. Pour le ticker "${ticker}", génère une série de données de prix de clôture pour les 30 derniers jours (aujourd'hui inclus). La réponse doit être UNIQUEMENT un tableau JSON valide d'objets, sans aucun texte ou formatage supplémentaire. Chaque objet doit représenter un jour et avoir la structure : { "date": "YYYY-MM-DD", "price": number }. Le tableau doit être ordonné du jour le plus ancien au plus récent. Les prix doivent montrer une volatilité réaliste et suivre une tendance crédible basée sur la performance récente de l'entreprise.`;
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAI().models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
@@ -184,7 +192,7 @@ export const getMarketOverview = async (): Promise<MarketIndex[]> => {
     La réponse doit être UNIQUEMENT un tableau JSON d'objets valide, sans aucun texte ou formatage supplémentaire comme du markdown.`;
 
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAI().models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
@@ -214,7 +222,7 @@ export const searchPublicTenders = async (query: string): Promise<PublicTender[]
         }
         Retourne entre 5 et 10 appels d'offres réalistes mais fictifs. Assure-toi que les données sont crédibles et bien formatées.`;
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAI().models.generateContent({
             model: "gemini-2.5-pro",
             contents: prompt,
             config: {
@@ -235,7 +243,7 @@ export const searchPublicTenders = async (query: string): Promise<PublicTender[]
 };
 
 export const generateStrategyStream = async (prompt: string) => {
-    return await ai.models.generateContentStream({
+    return await getAI().models.generateContentStream({
         model: "gemini-2.5-flash",
         contents: `Agis en tant que conseiller financier expert et mentor. Génère une stratégie d'investissement détaillée ou une réponse instructive basée sur la demande suivante : "${prompt}". La réponse doit être bien structurée, informative, et facile à comprendre. Utilise le format Markdown.`,
     });
@@ -247,7 +255,7 @@ export const getEducationalContentStream = async (topic: string) => {
     Inclus des titres, des listes à puces si nécessaire, et mets en gras les termes importants.
     L'objectif est d'être informatif et engageant.`;
     
-    return await ai.models.generateContentStream({
+    return await getAI().models.generateContentStream({
         model: "gemini-2.5-flash",
         contents: prompt,
     });
