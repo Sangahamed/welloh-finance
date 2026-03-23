@@ -211,3 +211,11 @@ export interface TradeFeedback {
     improvements: string[];
     advice: string;
 }
+
+// Quiz IA
+export interface QuizQuestion {
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+}

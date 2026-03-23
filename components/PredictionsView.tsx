@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getPredictions, createPrediction, placeBet, getUserBets } from '../lib/database';
+import { getPredictions, createPrediction, placeBet, getUserBets, resolvePrediction } from '../lib/database';
 import { generatePredictionIdeas } from '../services/geminiService';
 import type { Prediction, Bet, PredictionOption } from '../types';
 import NeonCard from './ui/NeonCard';
@@ -59,7 +59,9 @@ const PredictionCard: React.FC<{
     prediction: Prediction;
     userBet: Bet | undefined;
     onBet: (prediction: Prediction) => void;
-}> = ({ prediction, userBet, onBet }) => {
+    currentUserId?: string;
+    onResolve?: (prediction: Prediction) => void;
+}> = ({ prediction, userBet, onBet, currentUserId, onResolve }) => {
     const catColor = CATEGORY_COLORS[prediction.category] ?? 'cyan';
     const status = STATUS_CONFIG[prediction.status];
     const days = daysLeft(prediction.expiresAt);
@@ -149,6 +151,17 @@ const PredictionCard: React.FC<{
                     Vous avez parié {userBet.amount} pts sur «{prediction.options.find(o => o.id === userBet.optionId)?.label}»
                 </div>
             )}
+            {prediction.status === 'active' && currentUserId === prediction.creatorId && onResolve && (
+                <NeonButton
+                    variant="green"
+                    size="sm"
+                    fullWidth
+                    onClick={(e) => { e.stopPropagation(); onResolve(prediction); }}
+                >
+                    <CheckCircleIcon className="w-4 h-4 mr-1" />
+                    Résoudre (créateur)
+                </NeonButton>
+            )}
         </NeonCard>
     );
 };
@@ -231,6 +244,80 @@ const BetModal: React.FC<{
                         <div className="grid grid-cols-2 gap-3">
                             <NeonButton variant="ghost" size="md" onClick={onClose} type="button">Annuler</NeonButton>
                             <NeonButton variant="cyan" size="md" type="submit" loading={isLoading}>Confirmer</NeonButton>
+                        </div>
+                    </form>
+                </NeonCard>
+            </div>
+        </div>
+    );
+};
+
+// ─── Resolve Prediction Modal ─────────────────────────────────────────────────
+const ResolveModal: React.FC<{
+    prediction: Prediction;
+    onClose: () => void;
+    onResolve: (predictionId: string, optionId: string) => Promise<void>;
+}> = ({ prediction, onClose, onResolve }) => {
+    const [selectedOption, setSelectedOption] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedOption) { setError("Sélectionnez l'option gagnante."); return; }
+        setIsLoading(true);
+        setError(null);
+        try {
+            await onResolve(prediction.id, selectedOption);
+            onClose();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Erreur lors de la résolution.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+            <div className="w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <NeonCard variant="green" className="p-6">
+                    <h2 className="text-xl font-bold text-white mb-1">Résoudre la prédiction</h2>
+                    <p className="text-gray-400 text-sm mb-5 line-clamp-2">{prediction.title}</p>
+
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-2">Option gagnante</label>
+                            <div className="space-y-2">
+                                {prediction.options.map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => setSelectedOption(opt.id)}
+                                        className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
+                                            selectedOption === opt.id
+                                                ? 'border-neon-green bg-neon-green/10 text-neon-green'
+                                                : 'border-white/10 text-gray-300 hover:border-white/30'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="flex items-center gap-2 text-red-400 text-sm">
+                                <ExclamationTriangleIcon className="w-4 h-4" />
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <NeonButton variant="ghost" size="md" onClick={onClose} type="button">Annuler</NeonButton>
+                            <NeonButton variant="green" size="md" type="submit" loading={isLoading}>
+                                <CheckCircleIcon className="w-4 h-4 mr-1" />
+                                Confirmer
+                            </NeonButton>
                         </div>
                     </form>
                 </NeonCard>
@@ -454,6 +541,7 @@ const PredictionsView: React.FC = () => {
     const [activeCategory, setActiveCategory] = useState<string>('all');
     const [activeStatus, setActiveStatus] = useState<string>('active');
     const [betTarget, setBetTarget] = useState<Prediction | null>(null);
+    const [resolveTarget, setResolveTarget] = useState<Prediction | null>(null);
     const [showCreate, setShowCreate] = useState(false);
     const [dbAvailable, setDbAvailable] = useState(true);
 
@@ -499,6 +587,16 @@ const PredictionsView: React.FC = () => {
         const created = await createPrediction(currentUser.id, currentUser.fullName, payload);
         if (!created) throw new Error("Impossible de créer la prédiction. La base de données n'est peut-être pas encore configurée.");
         setPredictions(prev => [created, ...prev]);
+    };
+
+    const handleResolve = async (predictionId: string, winningOptionId: string) => {
+        const success = await resolvePrediction(predictionId, winningOptionId);
+        if (!success) throw new Error("Impossible de résoudre la prédiction. Vérifiez votre connexion à la base de données.");
+        setPredictions(prev => prev.map(p =>
+            p.id === predictionId
+                ? { ...p, status: 'resolved', resolvedOptionId: winningOptionId }
+                : p
+        ));
     };
 
     const stats = {
@@ -611,6 +709,8 @@ const PredictionsView: React.FC = () => {
                                 prediction={p}
                                 userBet={userBets.find(b => b.predictionId === p.id)}
                                 onBet={setBetTarget}
+                                currentUserId={currentUser?.id}
+                                onResolve={setResolveTarget}
                             />
                         ))}
                     </div>
@@ -629,6 +729,13 @@ const PredictionsView: React.FC = () => {
                 <CreatePredictionModal
                     onClose={() => setShowCreate(false)}
                     onCreate={handleCreate}
+                />
+            )}
+            {resolveTarget && (
+                <ResolveModal
+                    prediction={resolveTarget}
+                    onClose={() => setResolveTarget(null)}
+                    onResolve={handleResolve}
                 />
             )}
         </div>

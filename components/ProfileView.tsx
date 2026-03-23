@@ -425,6 +425,84 @@ const ProfileView: React.FC<ProfileViewProps> = ({ userId, onNavigate }) => {
                     </div>
                 )}
 
+                {/* Skills Matrix */}
+                {isOwnProfile && (() => {
+                    const txs = viewedUser.transactions || [];
+                    const totalTrades = txs.length;
+                    const distinctTickers = new Set(txs.map(t => t.ticker)).size;
+                    const sells = txs.filter(t => t.type === 'sell').length;
+                    const recentTxs = txs.filter(t => Date.now() - t.timestamp < 30 * 24 * 3600 * 1000).length;
+                    const pnlPct = portfolioGainLossPercent;
+
+                    const skills = [
+                        {
+                            label: 'Diversification',
+                            value: Math.min(100, Math.round((distinctTickers / 8) * 100)),
+                            color: 'neon-cyan',
+                            desc: `${distinctTickers} actif${distinctTickers > 1 ? 's' : ''} différent${distinctTickers > 1 ? 's' : ''}`,
+                        },
+                        {
+                            label: 'Activité de trading',
+                            value: Math.min(100, Math.round((totalTrades / 30) * 100)),
+                            color: 'neon-violet',
+                            desc: `${totalTrades} trade${totalTrades > 1 ? 's' : ''} au total`,
+                        },
+                        {
+                            label: 'Gestion du risque',
+                            value: totalTrades > 0 ? Math.min(100, Math.round((sells / totalTrades) * 100 * 1.5)) : 0,
+                            color: 'neon-green',
+                            desc: `${sells} vente${sells > 1 ? 's' : ''} réalisée${sells > 1 ? 's' : ''}`,
+                        },
+                        {
+                            label: 'Rendement',
+                            value: Math.min(100, Math.max(0, Math.round(50 + pnlPct * 2))),
+                            color: pnlPct >= 0 ? 'neon-green' : 'red-400',
+                            desc: `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}% de rendement`,
+                        },
+                        {
+                            label: 'Constance (30j)',
+                            value: Math.min(100, Math.round((recentTxs / 10) * 100)),
+                            color: 'neon-magenta',
+                            desc: `${recentTxs} trade${recentTxs > 1 ? 's' : ''} ce mois`,
+                        },
+                    ];
+
+                    return (
+                        <NeonCard color="violet">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-lg bg-neon-violet/20 flex items-center justify-center">
+                                    <ChartBarIcon className="w-5 h-5 text-neon-violet" />
+                                </div>
+                                <h3 className="text-xl font-display font-bold text-white">Matrice de Compétences</h3>
+                            </div>
+                            <div className="space-y-5">
+                                {skills.map(skill => (
+                                    <div key={skill.label}>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-sm font-medium text-gray-300">{skill.label}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-gray-500">{skill.desc}</span>
+                                                <span className={`text-sm font-bold text-${skill.color}`}>{skill.value}%</span>
+                                            </div>
+                                        </div>
+                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-1000 ease-out"
+                                                style={{
+                                                    width: `${skill.value}%`,
+                                                    background: skill.color.startsWith('neon')
+                                                        ? `var(--${skill.color})`
+                                                        : '#f87171',
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </NeonCard>
+                    );
+                })()}
+
                 {/* Holdings and Transactions */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <NeonCard color="cyan">

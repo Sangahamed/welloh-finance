@@ -317,6 +317,34 @@ Analyse cette décision de trading et fournis un feedback pédagogique. Réponds
     }
 };
 
+export const generateQuiz = async (
+    topic: string,
+    difficulty: string,
+    count: number = 5
+): Promise<import('../types').QuizQuestion[]> => {
+    const prompt = `Tu es un éducateur financier expert. Génère ${count} questions de quiz sur le thème "${topic}" pour un niveau "${difficulty}".
+Réponds UNIQUEMENT avec un tableau JSON valide sans texte ni markdown. Chaque objet doit avoir:
+- "question": string (la question)
+- "options": string[] (exactement 4 options de réponse)
+- "correctIndex": number (index 0-3 de la bonne réponse)
+- "explanation": string (explication pédagogique de 1-2 phrases)
+
+Les questions doivent être pertinentes pour les marchés africains et mondiaux. Pour débutant: notions de base. Pour intermédiaire: analyse technique/fondamentale. Pour avancé: stratégies complexes, ratios avancés.`;
+
+    try {
+        const response = await getAI().models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        const jsonText = cleanJsonString(response.text);
+        const data = JSON.parse(jsonText);
+        if (!Array.isArray(data)) throw new Error("Format inattendu");
+        return data;
+    } catch (error) {
+        handleApiError(error, "Impossible de générer le quiz.");
+    }
+};
+
 export const getEducationalContentStream = async (topic: string) => {
     const prompt = `En tant qu'éducateur financier expert, rédige un article clair et concis sur le sujet suivant : "${topic}".
     L'article doit être bien structuré, facile à comprendre pour un public varié (allant du débutant à l'intermédiaire), et utiliser le format Markdown.

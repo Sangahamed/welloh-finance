@@ -46,12 +46,12 @@
 | **Feedback IA post-trade (Gemini)** | ✅ Fait | `StockChartView.tsx`, `geminiService.ts` | Ajouté |
 | **Système de badges & achievements** | ✅ Fait | `BadgesView.tsx`, `types.ts` | Ajouté |
 | **Export CSV des transactions** | ✅ Fait | `DashboardView.tsx` | Ajouté |
+| **Streaks de trading** | ✅ Fait | `DashboardView.tsx` | Jours consécutifs + quick stats bar |
+| **Résolution des prédictions (créateur)** | ✅ Fait | `PredictionsView.tsx`, `lib/database.ts` | Bouton + modal de résolution |
 | Cohortes « timeless » | ⏳ À faire | `LeaderboardView.tsx` | Grouper par date d'inscription |
 | Flux d'activité temps réel (WebSocket) | ⏳ À faire | Nouveau composant | Nécessite backend WebSocket |
 | Carnet d'ordres par prédiction | ⏳ À faire | `PredictionsView.tsx` | Order book complet |
 | Chat en temps réel par prédiction | ⏳ À faire | `PredictionsView.tsx` | Nécessite WebSocket / Supabase Realtime |
-| Résolution des prédictions par admin/oracle | ⏳ À faire | `AdminDashboardView.tsx` | |
-| Streaks & récompenses de performance | ⏳ À faire | `BadgesView.tsx` | |
 
 ---
 
@@ -62,7 +62,7 @@
 | Copie de portefeuilles (social trading) | ❌ Non fait | Autorisation + réplication des trades |
 | Salles de trading virtuelles (groupes) | ❌ Non fait | Chat groupé + trades partagés |
 | Système de mentorat (mentors élite) | ❌ Non fait | Trades visibles, abonnements |
-| Matrice de compétences multi-dimensions | ❌ Non fait | Gestion du risque, timing, analyse |
+| **Matrice de compétences multi-dimensions** | ✅ Fait | `ProfileView.tsx` | 5 dimensions (diversification, activité, risque, rendement, constance) |
 | Certification des traders | ❌ Non fait | Badge/diplôme vérifiable |
 | Portail recruteur (premium) | ❌ Non fait | Vue des talents identifiés |
 
@@ -73,7 +73,7 @@
 | Tâche | Statut | Notes |
 |-------|--------|-------|
 | Feedback IA post-trade (Gemini) | ✅ Fait | Note A-F + conseils |
-| Quiz personnalisés générés par IA | ❌ Non fait | Basé sur les erreurs récurrentes |
+| **Quiz personnalisés générés par IA** | ✅ Fait | `QuizView.tsx`, `geminiService.ts` | 6 thèmes × 3 niveaux, questions + explications Gemini |
 | Amélioration du chatbot mentor | ❌ Non fait | Mémoire conversationnelle |
 | Microservices Go (leaderboard) | ❌ Non fait | Architecture future |
 | Microservices Python (analytics) | ❌ Non fait | Architecture future |

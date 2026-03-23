@@ -397,6 +397,20 @@ export const getUserBets = async (userId: string): Promise<Bet[]> => {
     }
 };
 
+export const resolvePrediction = async (predictionId: string, winningOptionId: string): Promise<boolean> => {
+    if (!supabase) return false;
+    try {
+        const { error } = await supabase
+            .from('predictions')
+            .update({ status: 'resolved', resolved_option_id: winningOptionId })
+            .eq('id', predictionId);
+        return !error;
+    } catch (e) {
+        console.error("Error resolving prediction:", e);
+        return false;
+    }
+};
+
 function mapPrediction(d: any): Prediction {
     return {
         id: d.id,

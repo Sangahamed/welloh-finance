@@ -29,6 +29,27 @@ const getLevel = (value: number) => {
   return [...levels].reverse().find(level => value >= level.threshold) || levels[0];
 };
 
+const getTradingStreak = (transactions: Transaction[]): number => {
+  if (!transactions || transactions.length === 0) return 0;
+  const dates = [...new Set(transactions.map(t =>
+    new Date(t.timestamp).toISOString().slice(0, 10)
+  ))].sort((a, b) => b.localeCompare(a));
+
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < dates.length; i++) {
+    const expected = new Date(today);
+    expected.setDate(today.getDate() - i);
+    const expectedStr = expected.toISOString().slice(0, 10);
+    if (dates[i] === expectedStr) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+};
+
 // Search Results Table Component - Neon style
 const SearchResultsTable: React.FC<{
   stocks: StockData[];
@@ -483,6 +504,32 @@ const DashboardView: React.FC<{ onNavigate: (page: string) => void; }> = ({ onNa
           {userLevel.name} - Niveau {levels.indexOf(userLevel) + 1}
         </NeonBadge>
       </div>
+
+      {/* Quick Stats */}
+      {(() => {
+        const streak = getTradingStreak(currentUserAccount.transactions);
+        const totalTrades = currentUserAccount.transactions.length;
+        const winRate = currentUserAccount.portfolio.winRate;
+        return (
+          <div className="grid grid-cols-3 gap-4">
+            <NeonCard className="p-4 text-center">
+              <div className="text-3xl font-display font-bold text-neon-cyan">{totalTrades}</div>
+              <div className="text-xs text-gray-500 mt-1">Trades totaux</div>
+            </NeonCard>
+            <NeonCard className={`p-4 text-center ${streak >= 3 ? 'border-orange-400/40' : ''}`}>
+              <div className={`text-3xl font-display font-bold flex items-center justify-center gap-1 ${streak >= 3 ? 'text-orange-400' : 'text-gray-400'}`}>
+                {streak >= 1 && <span>🔥</span>}
+                {streak}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">Jours consécutifs</div>
+            </NeonCard>
+            <NeonCard className="p-4 text-center">
+              <div className="text-3xl font-display font-bold text-neon-green">{winRate || '0%'}</div>
+              <div className="text-xs text-gray-500 mt-1">Win Rate</div>
+            </NeonCard>
+          </div>
+        );
+      })()}
       
       {/* Search Section */}
       <NeonCard variant="default" className="p-6">
